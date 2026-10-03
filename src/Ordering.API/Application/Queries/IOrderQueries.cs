@@ -6,5 +6,7 @@ public interface IOrderQueries
 
     Task<IEnumerable<OrderSummary>> GetOrdersFromUserAsync(string userId);
 
+    Task<bool> IsOrderOwnedByUserAsync(int orderId, string userId);
+
     Task<IEnumerable<CardType>> GetCardTypesAsync();
 }

@@ -19,7 +19,7 @@ public static class OrdersApi
         return api;
     }
 
-    public static async Task<Results<Ok, BadRequest<string>, ProblemHttpResult>> CancelOrderAsync(
+    public static async Task<Results<Ok, BadRequest<string>, NotFound, ProblemHttpResult>> CancelOrderAsync(
         [FromHeader(Name = "x-requestid")] Guid requestId,
         CancelOrderCommand command,
         [AsParameters] OrderServices services)
@@ -27,6 +27,14 @@ public static class OrdersApi
         if (requestId == Guid.Empty)
         {
             return TypedResults.BadRequest("Empty GUID is not valid for request ID");
+        }
+
+        // Users may only cancel their own orders. Unknown orders and orders owned by
+        // someone else both return 404 so order numbers can't be probed.
+        var userId = services.IdentityService.GetUserIdentity();
+        if (!await services.Queries.IsOrderOwnedByUserAsync(command.OrderNumber, userId))
+        {
+            return TypedResults.NotFound();
         }
 
         var requestCancelOrder = new IdentifiedCommand<CancelOrderCommand, bool>(command, requestId);
