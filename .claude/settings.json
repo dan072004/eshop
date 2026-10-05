@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/dotnet-format.ps1\"",
+            "timeout": 120,
+            "statusMessage": "Running dotnet format on staged files..."
+          }
+        ]
+      }
+    ]
+  }
+}
