@@ -64,3 +64,17 @@ WebApp also subscribes to the status-change events so it can push live updates (
 `.github/skills/` contains agent skills for the Aspire CLI (`aspire`, `aspire-orchestration` for file locks and orphaned processes, `aspire-monitoring` for logs, traces and the dashboard, `aspire-deployment`), `dotnet-inspect` (querying NuGet and .NET APIs), and `playwright-cli`. Read the relevant `SKILL.md` before working in those areas.
 
 Before reporting work as done, run the `verify` skill (`.claude/skills/verify`). It builds, runs the tests that match the diff, and reports PASS/FAIL/SKIPPED with evidence. A PreToolUse hook (`.claude/hooks/verify-gate.ps1`) denies `git commit` while uncommitted code changes haven't passed verification.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs are local Markdown files under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), recorded as a `Status:` line in each ticket file. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
