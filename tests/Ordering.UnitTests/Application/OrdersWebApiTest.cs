@@ -126,6 +126,8 @@ public class OrdersWebApiTest
         // Arrange
         var fakeOrderId = 123;
         var fakeDynamicResult = new Order();
+        _identityServiceMock.GetUserIdentity().Returns("user-1");
+        _orderQueriesMock.IsOrderOwnedByUserAsync(fakeOrderId, "user-1").Returns(Task.FromResult(true));
         _orderQueriesMock.GetOrderAsync(Arg.Any<int>())
             .Returns(Task.FromResult(fakeDynamicResult));
 
@@ -143,6 +145,8 @@ public class OrdersWebApiTest
     {
         // Arrange
         var fakeOrderId = 123;
+        _identityServiceMock.GetUserIdentity().Returns("user-1");
+        _orderQueriesMock.IsOrderOwnedByUserAsync(fakeOrderId, "user-1").Returns(Task.FromResult(true));
 #pragma warning disable NS5003
         _orderQueriesMock.GetOrderAsync(Arg.Any<int>())
             .Throws(new KeyNotFoundException());
@@ -154,6 +158,23 @@ public class OrdersWebApiTest
 
         // Assert
         Assert.IsInstanceOfType<NotFound>(result.Result);
+    }
+
+    [TestMethod]
+    public async Task Get_order_not_owned_by_user_returns_not_found()
+    {
+        // Arrange
+        var fakeOrderId = 123;
+        _identityServiceMock.GetUserIdentity().Returns("user-1");
+        _orderQueriesMock.IsOrderOwnedByUserAsync(fakeOrderId, "user-1").Returns(Task.FromResult(false));
+
+        // Act
+        var orderServices = new OrderServices(_mediatorMock, _orderQueriesMock, _identityServiceMock, _loggerMock);
+        var result = await OrdersApi.GetOrderAsync(fakeOrderId, orderServices);
+
+        // Assert
+        Assert.IsInstanceOfType<NotFound>(result.Result);
+        await _orderQueriesMock.DidNotReceive().GetOrderAsync(Arg.Any<int>());
     }
 
     [TestMethod]

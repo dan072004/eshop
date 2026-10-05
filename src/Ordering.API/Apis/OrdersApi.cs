@@ -87,6 +87,14 @@ public static class OrdersApi
 
     public static async Task<Results<Ok<Order>, NotFound>> GetOrderAsync(int orderId, [AsParameters] OrderServices services)
     {
+        // Users may only read their own orders. Unknown orders and orders owned by
+        // someone else both return 404 so order numbers can't be probed.
+        var userId = services.IdentityService.GetUserIdentity();
+        if (!await services.Queries.IsOrderOwnedByUserAsync(orderId, userId))
+        {
+            return TypedResults.NotFound();
+        }
+
         try
         {
             var order = await services.Queries.GetOrderAsync(orderId);
@@ -128,9 +136,9 @@ public static class OrdersApi
         CreateOrderRequest request,
         [AsParameters] OrderServices services)
     {
-        
+
         //mask the credit card number
-        
+
         services.Logger.LogInformation(
             "Sending command: {CommandName} - {IdProperty}: {CommandId}",
             request.GetGenericTypeName(),
