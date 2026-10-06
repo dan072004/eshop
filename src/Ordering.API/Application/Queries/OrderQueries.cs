@@ -36,16 +36,26 @@ public class OrderQueries(OrderingContext context)
 
     public async Task<IEnumerable<OrderSummary>> GetOrdersFromUserAsync(string userId)
     {
-        return await context.Orders
-            .Where(o => o.Buyer.IdentityGuid == userId)  
-            .Select(o => new OrderSummary
+        // Same total formula as Order.GetTotal(): sum of (units * unit price - item discount),
+        // clamped so the total is never below zero. Kept in sync so both totals always agree.
+        var orders = await context.Orders
+            .Where(o => o.Buyer.IdentityGuid == userId)
+            .Select(o => new
             {
-                OrderNumber = o.Id,
-                Date = o.OrderDate,
-                Status = o.OrderStatus.ToString(),
-                Total =(double) o.OrderItems.Sum(oi => oi.UnitPrice* oi.Units)
+                o.Id,
+                o.OrderDate,
+                o.OrderStatus,
+                Total = o.OrderItems.Sum(oi => oi.UnitPrice * oi.Units - oi.Discount)
             })
             .ToListAsync();
+
+        return orders.Select(o => new OrderSummary
+        {
+            OrderNumber = o.Id,
+            Date = o.OrderDate,
+            Status = o.OrderStatus.ToString(),
+            Total = (double)Math.Max(0m, o.Total)
+        });
     }
 
     public Task<bool> IsOrderOwnedByUserAsync(int orderId, string userId)

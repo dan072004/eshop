@@ -6,7 +6,12 @@ using Asp.Versioning.Http;
 using eShop.Ordering.API.Application.Commands;
 using eShop.Ordering.API.Application.Models;
 using eShop.Ordering.API.Application.Queries;
+using eShop.Ordering.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using DomainOrder = eShop.Ordering.Domain.AggregatesModel.OrderAggregate.Order;
+using DomainAddress = eShop.Ordering.Domain.AggregatesModel.OrderAggregate.Address;
+using Buyer = eShop.Ordering.Domain.AggregatesModel.BuyerAggregate.Buyer;
 
 namespace eShop.Ordering.FunctionalTests;
 
@@ -230,6 +235,63 @@ public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
         var orderItemsProductIds = responseData.OrderItems.Select(x => x.ProductId);
         Assert.All(orderItemsProductIds, orderItemProdId => payloadItemsProductIds.Contains(orderItemProdId));
         // TODO: might need to add more asserts in here
+    }
+
+    [Fact]
+    public async Task OrderTotalsSubtractItemDiscountsAndAgree()
+    {
+        // Arrange: seed an Order for the auto-authorized buyer whose single item has a discount.
+        // 3 units x 10.00 = 30.00, minus a 4.50 item discount => total 25.50.
+        var orderId = await SeedOrderWithDiscountAsync(
+            unitPrice: 10.00m, units: 3, discount: 4.50m);
+
+        var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+        // Act 1: single-Order total through the API.
+        var singleResponse = await _httpClient.GetAsync($"api/orders/{orderId}", TestContext.Current.CancellationToken);
+        singleResponse.EnsureSuccessStatusCode();
+        var singleBody = await singleResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        var order = JsonSerializer.Deserialize<Order>(singleBody, jsonOptions);
+
+        // Act 2: Orders-list total through the API.
+        var listResponse = await _httpClient.GetAsync("api/orders", TestContext.Current.CancellationToken);
+        listResponse.EnsureSuccessStatusCode();
+        var listBody = await listResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        var summaries = JsonSerializer.Deserialize<List<OrderSummary>>(listBody, jsonOptions);
+        var summary = summaries.Single(s => s.OrderNumber == orderId);
+
+        // Assert: both totals subtract the item discount and agree.
+        Assert.Equal(25.50m, order.Total);
+        Assert.Equal(25.50, summary.Total);
+        Assert.Equal((double)order.Total, summary.Total);
+    }
+
+    private async Task<int> SeedOrderWithDiscountAsync(decimal unitPrice, int units, decimal discount)
+    {
+        using var scope = _webApplicationFactory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<OrderingContext>();
+
+        var buyer = await context.Buyers
+            .FirstOrDefaultAsync(b => b.IdentityGuid == AutoAuthorizeMiddleware.IDENTITY_ID, TestContext.Current.CancellationToken);
+        if (buyer is null)
+        {
+            buyer = new Buyer(AutoAuthorizeMiddleware.IDENTITY_ID, "Test Buyer");
+            context.Buyers.Add(buyer);
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var address = new DomainAddress("street", "city", "state", "country", "zipcode");
+        var order = new DomainOrder(
+            AutoAuthorizeMiddleware.IDENTITY_ID, "Test Buyer", address,
+            cardTypeId: 1, cardNumber: "1234", cardSecurityNumber: "123",
+            cardHolderName: "Test Buyer", cardExpiration: DateTime.UtcNow.AddYears(1),
+            buyerId: buyer.Id);
+        order.AddOrderItem(1, "Discounted product", unitPrice, discount, "pic", units);
+
+        context.Orders.Add(order);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        return order.Id;
     }
 
     string BuildOrder()
