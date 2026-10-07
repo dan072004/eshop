@@ -8,6 +8,15 @@ RUN apt-get update && apt-get install -y \
   libicu72 \
   && rm -rf /var/lib/apt/lists/*
 
+# Install PowerShell: the Claude Code hook in .claude/settings.json (the verify gate) runs
+# `powershell`, so alias it to pwsh. Without it the hook blocks every Bash call in the sandbox.
+RUN curl -fsSL https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -o /tmp/packages-microsoft-prod.deb \
+  && dpkg -i /tmp/packages-microsoft-prod.deb \
+  && rm /tmp/packages-microsoft-prod.deb \
+  && apt-get update && apt-get install -y powershell \
+  && rm -rf /var/lib/apt/lists/* \
+  && ln -s "$(command -v pwsh)" /usr/local/bin/powershell
+
 # The issue tracker is local Markdown in .scratch/ read by .sandcastle/issues.mjs (Node), so no CLI is needed.
 
 # Build-args for UID/GID alignment: sandcastle docker build-image
