@@ -11,15 +11,15 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.Extensions.Identity.Stores" />
-    <PackageReference Include="NSubstitute" />
-    <PackageReference Include="NSubstitute.Analyzers.CSharp">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Basket.API\Basket.API.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The fake that BasketRepositoryContract proves in the functional tests. Linked, not referenced, so these tests need no Docker. -->
+    <Compile Include="..\Basket.FunctionalTests\InMemoryBasketRepository.cs" Link="Helpers\InMemoryBasketRepository.cs" />
   </ItemGroup>
 
 </Project>
