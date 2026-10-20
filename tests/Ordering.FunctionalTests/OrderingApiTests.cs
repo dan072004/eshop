@@ -6,7 +6,12 @@ using Asp.Versioning.Http;
 using eShop.Ordering.API.Application.Commands;
 using eShop.Ordering.API.Application.Models;
 using eShop.Ordering.API.Application.Queries;
+using eShop.Ordering.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using DomainOrder = eShop.Ordering.Domain.AggregatesModel.OrderAggregate.Order;
+using DomainAddress = eShop.Ordering.Domain.AggregatesModel.OrderAggregate.Address;
+using Buyer = eShop.Ordering.Domain.AggregatesModel.BuyerAggregate.Buyer;
 
 namespace eShop.Ordering.FunctionalTests;
 
@@ -202,6 +207,89 @@ public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
         Assert.Equal(payload.Items.Count(), responseData.OrderItems.Count());
         Assert.Equal(payload.Items.Sum(o => o.Quantity * o.UnitPrice), responseData.Total);
         AssertThatOrderItemsAreTheSameAsRequestPayloadItems(payload, responseData);
+    }
+
+    [Fact]
+    public async Task CancellingAnotherBuyersOrderReturnsNotFound()
+    {
+        // Arrange
+        var orderId = await SeedOrderAsync(ownerIdentity: $"other-{Guid.NewGuid()}");
+
+        // Act
+        var response = await CancelOrderAsync(orderId);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GettingAnotherBuyersOrderReturnsNotFound()
+    {
+        // Arrange
+        var orderId = await SeedOrderAsync(ownerIdentity: $"other-{Guid.NewGuid()}");
+
+        // Act
+        var response = await _httpClient.GetAsync($"api/orders/{orderId}", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task OwnerCanCancelTheirOrder()
+    {
+        // Arrange
+        var orderId = await SeedOrderAsync(ownerIdentity: AutoAuthorizeMiddleware.IDENTITY_ID);
+
+        // Act
+        var cancelResponse = await CancelOrderAsync(orderId);
+
+        // Assert: the cancel succeeded and the Order now reads back as Cancelled.
+        Assert.Equal(HttpStatusCode.OK, cancelResponse.StatusCode);
+        var getResponse = await _httpClient.GetAsync($"api/orders/{orderId}", TestContext.Current.CancellationToken);
+        getResponse.EnsureSuccessStatusCode();
+        var order = JsonSerializer.Deserialize<Order>(
+            await getResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        Assert.Equal("Cancelled", order.Status);
+    }
+
+    private Task<HttpResponseMessage> CancelOrderAsync(int orderId)
+    {
+        var content = new StringContent(JsonSerializer.Serialize(new CancelOrderCommand(orderId)), UTF8Encoding.UTF8, "application/json")
+        {
+            Headers = { { "x-requestid", Guid.NewGuid().ToString() } }
+        };
+        return _httpClient.PutAsync("api/orders/cancel", content, TestContext.Current.CancellationToken);
+    }
+
+    // Writes a Submitted Order owned by the given identity straight to the database and returns its number.
+    private async Task<int> SeedOrderAsync(string ownerIdentity)
+    {
+        using var scope = _webApplicationFactory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<OrderingContext>();
+
+        var buyer = await context.Buyers
+            .FirstOrDefaultAsync(b => b.IdentityGuid == ownerIdentity, TestContext.Current.CancellationToken);
+        if (buyer is null)
+        {
+            buyer = new Buyer(ownerIdentity, "Test Buyer");
+            context.Buyers.Add(buyer);
+            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        var address = new DomainAddress("street", "city", "state", "country", "zipcode");
+        var order = new DomainOrder(
+            ownerIdentity, "Test Buyer", address,
+            cardTypeId: 1, cardNumber: "1234", cardSecurityNumber: "123",
+            cardHolderName: "Test Buyer", cardExpiration: DateTime.UtcNow.AddYears(1),
+            buyerId: buyer.Id);
+        order.AddOrderItem(1, "Test product", 10m, 0m, "pic", 1);
+
+        context.Orders.Add(order);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        return order.Id;
     }
 
     private CreateOrderDraftCommand FakeOrderDraftCommand()
