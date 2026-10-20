@@ -16,6 +16,6 @@
 ## Comments
 
 - The repository tests passed on first run (they characterise existing SQL). Mutation-checked: flipping the age comparison fails the two age tests; dropping the `'Submitted'` filter fails the status test.
-- The service test's fake holds Submitted Orders with their age and applies only the age rule; the status rule lives in the SQL and is covered against Postgres. The fake has no shared contract test with the real adapter (the Postgres tests seed through `OrderingContext`, which the fake has no equivalent of).
+- Review follow-up: the service test's repository is now a canned-answer stub (`StubGracePeriodOrdersRepository`): it returns the Order ids the test configures and records the grace period it was asked for, with no age rule of its own. Both the age and status rules live in the SQL and are covered against Postgres, so the stub needs no contract test. The test asserts one `GracePeriodConfirmedIntegrationEvent` per returned id with the matching OrderId, nothing else published (`IEventBus` stays NSubstitute, a boundary), and that the repository was asked for `TimeSpan.FromMinutes(1)` when `GracePeriodTime = 1`. Mutation-checked: switching the service's `FromMinutes` to `FromSeconds` fails the test.
 - The new project adds two `NU1902` (MessagePack, via Aspire.Hosting) build warnings, the same pre-existing warning every other Aspire-hosted functional test project already emits; they are not escalated to errors.
 - The new project is also added to `eShop.slnx`.

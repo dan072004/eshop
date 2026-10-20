@@ -183,6 +183,8 @@ public partial class CatalogViewModel : ViewModelBase
             {
                 SelectCatalogBrand(default);
                 SelectCatalogType(default);
+                SelectedBrand = null;
+                SelectedType = null;
                 var allProducts = await _appEnvironmentService.CatalogService.GetCatalogAsync();
                 _products.ReloadData(allProducts);
                 IsFiltering = false;

@@ -17,6 +17,7 @@ namespace eShop.Ordering.FunctionalTests;
 
 public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
 {
+    private static readonly JsonSerializerOptions CamelCaseJson = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private readonly WebApplicationFactory<Program> _webApplicationFactory;
     private readonly HttpClient _httpClient;
 
@@ -41,7 +42,7 @@ public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var orders = JsonSerializer.Deserialize<List<OrderSummary>>(
             await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
-            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            CamelCaseJson);
         var summary = Assert.Single(orders, o => o.OrderNumber == orderId);
         Assert.Equal("Submitted", summary.Status);
         Assert.Equal(10d, summary.Total);
@@ -248,7 +249,7 @@ public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
         var response = await _httpClient.PostAsync("api/orders/draft", content, TestContext.Current.CancellationToken);
 
         var s = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        var responseData = JsonSerializer.Deserialize<OrderDraftDTO>(s, new JsonSerializerOptions() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        var responseData = JsonSerializer.Deserialize<OrderDraftDTO>(s, CamelCaseJson);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(payload.Items.Count(), responseData.OrderItems.Count());
@@ -297,7 +298,7 @@ public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
         getResponse.EnsureSuccessStatusCode();
         var order = JsonSerializer.Deserialize<Order>(
             await getResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
-            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            CamelCaseJson);
         Assert.Equal("Cancelled", order.Status);
     }
 
@@ -413,7 +414,7 @@ public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
         response.EnsureSuccessStatusCode();
         return JsonSerializer.Deserialize<Order>(
             await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
-            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            CamelCaseJson);
     }
 
     private CreateOrderDraftCommand FakeOrderDraftCommand()
