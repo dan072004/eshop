@@ -24,7 +24,12 @@ public class OrderAggregateTest
         var fakeOrderItem = new OrderItem(productId, productName, unitPrice, discount, pictureUrl, units);
 
         //Assert
-        Assert.IsNotNull(fakeOrderItem);
+        Assert.AreEqual(5, fakeOrderItem.Units);
+        Assert.AreEqual(12m, fakeOrderItem.UnitPrice);
+        Assert.AreEqual(15m, fakeOrderItem.Discount);
+        Assert.AreEqual(1, fakeOrderItem.ProductId);
+        Assert.AreEqual("FakeProductName", fakeOrderItem.ProductName);
+        Assert.AreEqual("FakeUrl", fakeOrderItem.PictureUrl);
     }
 
     [TestMethod]
@@ -52,9 +57,9 @@ public class OrderAggregateTest
         var discount = 15;
         var pictureUrl = "FakeUrl";
         var units = 1;
-        
+
         //Act - Assert
-        Assert.ThrowsExactly<OrderingDomainException>(() => new OrderItem(productId, productName, unitPrice, discount, pictureUrl, units));       
+        Assert.ThrowsExactly<OrderingDomainException>(() => new OrderItem(productId, productName, unitPrice, discount, pictureUrl, units));
     }
 
     [TestMethod]
