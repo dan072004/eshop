@@ -4,10 +4,16 @@
 
 **Blocked by:** 01 (Write the testing convention in CLAUDE.md)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A small, dictionary-backed fake of the basket repository interface lives in the Basket functional test project
-- [ ] An abstract xUnit contract class holds the repository behaviour tests (today's Redis repository cases move into it), asserting only through the repository interface
-- [ ] One concrete subclass runs the contract against Redis (existing fixture), another against the fake
-- [ ] Both subclasses pass
-- [ ] Redis coverage is the same as before or better: no current case is lost
+- [x] A small, dictionary-backed fake of the basket repository interface lives in the Basket functional test project
+- [x] An abstract xUnit contract class holds the repository behaviour tests (today's Redis repository cases move into it), asserting only through the repository interface
+- [x] One concrete subclass runs the contract against Redis (existing fixture), another against the fake
+- [x] Both subclasses pass
+- [x] Redis coverage is the same as before or better: no current case is lost
+
+## Comments
+
+- The fake stores JSON snapshots (using Basket.API's `BasketSerializationContext`), not object references. A new contract case, `StoredBasketIsASnapshotNotTheCallersObject`, failed against a reference-storing fake and passes against Redis, so it pins this behaviour.
+- Added a second new case, `UpdateReplacesTheBuyersBasketAndLeavesOtherBuyersAlone`. It passed on first run for both, since it characterises existing behaviour.
+- Redis now runs 4 cases (was 2). Both existing cases moved into `BasketRepositoryContract` unchanged; `RedisBasketRepositoryTests` keeps its name because CLAUDE.md cites it.
