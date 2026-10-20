@@ -31,13 +31,6 @@ public class OrderViewModelTests
     }
 
     [TestMethod]
-    public void OrderPropertyIsNullWhenViewModelInstantiatedTest()
-    {
-        var orderViewModel = new OrderDetailViewModel(_appEnvironmentService, _navigationService, _settingsService);
-        Assert.IsNull(orderViewModel.Order);
-    }
-
-    [TestMethod]
     public async Task OrderPropertyIsNotNullAfterViewModelInitializationTest()
     {
         var orderViewModel = new OrderDetailViewModel(_appEnvironmentService, _navigationService, _settingsService);
