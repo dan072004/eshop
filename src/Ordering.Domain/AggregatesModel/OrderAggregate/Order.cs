@@ -182,5 +182,5 @@ public class Order
         throw new OrderingDomainException($"Is not possible to change the order status from {OrderStatus} to {orderStatusToChange}.");
     }
 
-    public decimal GetTotal() => Math.Max(0m, _orderItems.Sum(o => o.Units * o.UnitPrice - o.Discount));
+    public decimal GetTotal() => _orderItems.Sum(o => o.Units * o.UnitPrice);
 }
