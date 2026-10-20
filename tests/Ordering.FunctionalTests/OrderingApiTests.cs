@@ -31,13 +31,20 @@ public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
     [Fact]
     public async Task GetAllStoredOrdersWorks()
     {
+        // Arrange
+        var orderId = await SeedOrderAsync(ownerIdentity: AutoAuthorizeMiddleware.IDENTITY_ID);
+
         // Act
         var response = await _httpClient.GetAsync("api/orders", TestContext.Current.CancellationToken);
-        var s = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        response.EnsureSuccessStatusCode();
 
-        // Assert
+        // Assert: the seeded Order is in the Buyer's list with its status and total.
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var orders = JsonSerializer.Deserialize<List<OrderSummary>>(
+            await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        var summary = Assert.Single(orders, o => o.OrderNumber == orderId);
+        Assert.Equal("Submitted", summary.Status);
+        Assert.Equal(10d, summary.Total);
     }
 
     [Fact]
@@ -112,10 +119,50 @@ public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
     }
 
     [Fact]
+    public async Task ShippingAPaidOrderMarksItShipped()
+    {
+        // Arrange
+        var orderId = await SeedPaidOrderAsync(ownerIdentity: AutoAuthorizeMiddleware.IDENTITY_ID);
+
+        // Act
+        var content = new StringContent(JsonSerializer.Serialize(new ShipOrderCommand(orderId)), UTF8Encoding.UTF8, "application/json")
+        {
+            Headers = { { "x-requestid", Guid.NewGuid().ToString() } }
+        };
+        var shipResponse = await _httpClient.PutAsync("api/orders/ship", content, TestContext.Current.CancellationToken);
+
+        // Assert: the ship succeeded and the Order now reads back as Shipped.
+        Assert.Equal(HttpStatusCode.OK, shipResponse.StatusCode);
+        var order = await ReadOrderAsync(orderId);
+        Assert.Equal("Shipped", order.Status);
+    }
+
+    [Fact]
+    public async Task GettingOwnOrderReturnsItsDetails()
+    {
+        // Arrange
+        var orderId = await SeedOrderAsync(ownerIdentity: AutoAuthorizeMiddleware.IDENTITY_ID);
+
+        // Act
+        var order = await ReadOrderAsync(orderId);
+
+        // Assert: the details are the ones the seed helper wrote.
+        Assert.Equal(orderId, order.OrderNumber);
+        Assert.Equal("Submitted", order.Status);
+        Assert.Equal("street", order.Street);
+        Assert.Equal("city", order.City);
+        Assert.Equal(10m, order.Total);
+        var item = Assert.Single(order.OrderItems);
+        Assert.Equal("Test product", item.ProductName);
+        Assert.Equal(1, item.Units);
+    }
+
+    [Fact]
     public async Task GetStoredOrdersWithOrderId()
     {
         // Act
-        var response = await _httpClient.GetAsync("api/orders/1", TestContext.Current.CancellationToken);
+        // An Order number no seeded Order can have, so the result doesn't depend on test order.
+        var response = await _httpClient.GetAsync($"api/orders/{int.MaxValue}", TestContext.Current.CancellationToken);
         var responseStatus = response.StatusCode;
 
         // Assert
@@ -290,6 +337,31 @@ public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return order.Id;
+    }
+
+    // Seeds an Order for the given identity and moves it through stock validation to Paid.
+    private async Task<int> SeedPaidOrderAsync(string ownerIdentity)
+    {
+        var orderId = await SeedOrderAsync(ownerIdentity);
+
+        using var scope = _webApplicationFactory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<OrderingContext>();
+        var order = await context.Orders.SingleAsync(o => o.Id == orderId, TestContext.Current.CancellationToken);
+        order.SetAwaitingValidationStatus();
+        order.SetStockConfirmedStatus();
+        order.SetPaidStatus();
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        return orderId;
+    }
+
+    private async Task<Order> ReadOrderAsync(int orderId)
+    {
+        var response = await _httpClient.GetAsync($"api/orders/{orderId}", TestContext.Current.CancellationToken);
+        response.EnsureSuccessStatusCode();
+        return JsonSerializer.Deserialize<Order>(
+            await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
     }
 
     private CreateOrderDraftCommand FakeOrderDraftCommand()
