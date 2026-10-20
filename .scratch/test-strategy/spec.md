@@ -1,6 +1,6 @@
 # Spec: Test strategy — mocks to seams
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 

@@ -159,4 +159,4 @@ total).
   Strengthen `GetAllStoredOrdersWorks` to seed an order and assert it is listed. Delete the ClientApp shape
   tests without replacement until ClientApp is worked on. Delete `Handle_throws_exception_when_no_buyerId`,
   or move it to the domain tests as a `Buyer` constructor test if none exists there.
-- Turning this into `.scratch/` tickets is a separate step.
+- Implemented as tickets 01–10 in `.scratch/test-strategy/` on branch `test-strategy-integration` (2026-10-20). Each ticket's Comments record deviations and the bugs found; ticket 11 (create-Order returns 200 on failure) is left for triage.
