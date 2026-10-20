@@ -71,7 +71,7 @@ Test behaviour through a public **seam** (an HTTP endpoint, a repository interfa
 | Nowhere near infrastructure (domain aggregates) | Plain fast test |
 
 - NSubstitute is for boundaries we don't own. Our own types (`IMediator`, handlers, query and repository interfaces) are used for real, or replaced by a fake. Assert on outcomes read back through the seam; `Received(...)` belongs only on a boundary such as `IEventBus`.
-- A fake is a small working implementation (e.g. a `Dictionary`-backed repository) that is allowed only when the real adapter just persists. Every fake runs the same contract tests as its real adapter, so it can't drift.
+- A fake is a small working implementation (e.g. a `Dictionary`-backed repository) that is allowed only when the real adapter just persists. Every fake runs the same contract tests as its real adapter, so it can't drift. A fake may only give answers the real adapter can give. A canned-answer stub for a query port needs no contract test; a fake that implements logic does.
 - Behaviour inside an adapter, like the ownership filter in Ordering's `OrderQueries` or the grace-period SQL in OrderProcessor, is tested against the real database.
 - Endpoints are tested only through HTTP in the functional tests, where the current user comes from the test auth middleware. The current user (`IIdentityService`) is not a boundary, and endpoint methods such as `OrdersApi.CancelOrderAsync` are not called directly from unit tests.
 - When a test replaces a mock-based one, delete the old test in the same change.

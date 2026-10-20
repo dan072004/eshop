@@ -51,12 +51,22 @@ public class CatalogViewModelTests
     public async Task ClearFilterCommandResetsPropertiesTest()
     {
         var catalogViewModel = new CatalogViewModel(_appEnvironmentService, _navigationService);
-
         await catalogViewModel.InitializeAsync();
+        var allProductCount = catalogViewModel.Products.Count;
+        catalogViewModel.SelectCatalogBrand(catalogViewModel.Brands[0].Value);
+        catalogViewModel.SelectCatalogType(catalogViewModel.Types[0].Value);
+        await catalogViewModel.ApplyFilterCommand.ExecuteUntilComplete(null);
+        catalogViewModel.FilterCommand.Execute(null);
+        Assert.IsLessThan(allProductCount, catalogViewModel.Products.Count);
+        Assert.IsTrue(catalogViewModel.IsFiltering);
+
         await catalogViewModel.ClearFilterCommand.ExecuteUntilComplete(null);
 
         Assert.IsNull(catalogViewModel.SelectedBrand);
         Assert.IsNull(catalogViewModel.SelectedType);
-        Assert.IsNotNull(catalogViewModel.Products);
+        Assert.IsFalse(catalogViewModel.Brands.Any(brand => brand.Selected));
+        Assert.IsFalse(catalogViewModel.Types.Any(type => type.Selected));
+        Assert.IsFalse(catalogViewModel.IsFiltering);
+        Assert.HasCount(allProductCount, catalogViewModel.Products);
     }
 }

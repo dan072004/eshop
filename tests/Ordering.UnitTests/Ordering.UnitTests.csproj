@@ -9,14 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="NSubstitute" />
-    <PackageReference Include="NSubstitute.Analyzers.CSharp">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\src\Ordering.API\Ordering.API.csproj" />
     <ProjectReference Include="..\..\src\Ordering.Domain\Ordering.Domain.csproj" />
     <ProjectReference Include="..\..\src\Ordering.Infrastructure\Ordering.Infrastructure.csproj" />

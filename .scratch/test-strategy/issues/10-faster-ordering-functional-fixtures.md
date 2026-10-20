@@ -20,6 +20,8 @@
 
 **Isolation.** Nothing resets the database. Each test that needs data seeds its own Order (and Buyer if missing), uses a fresh `other-{Guid}` identity or a fresh `x-requestid`, and finds its data by the returned Order number. The de-duplication test compares the Buyer's Order count before and after its own two posts, which holds because tests in one class run sequentially.
 
+**Review follow-up.** `PostingTheSameOrderTwiceWithOneRequestIdCreatesOneOrder` counts the shared test identity's Orders, so it relies on tests within the class running sequentially. Giving it a fresh identity needs functional tests to be able to act as another user (coupons ticket 03).
+
 **Timings (run alone, Docker warm, 2026-10-20).** Measured with the ticket 02 method (xUnit TRX). Another agent may have been running Basket tests at the same time, so each side was run at least twice and the better run is reported. "Wall" is the whole `dotnet test --no-build` command, including container start-up.
 
 | | Ticket 02 baseline | Before (best of 4) | After (best of 2) |

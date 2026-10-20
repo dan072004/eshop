@@ -1,4 +1,5 @@
 ﻿using eShop.EventBus.Abstractions;
+using eShop.EventBus.Events;
 using eShop.OrderProcessor;
 using eShop.OrderProcessor.Events;
 using eShop.OrderProcessor.Services;
@@ -13,12 +14,9 @@ public class OrderProcessorTests
     public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    public async Task PublishesGracePeriodConfirmationForEveryEligibleOrder()
+    public async Task PublishesGracePeriodConfirmationForEveryOrderPastTheGracePeriod()
     {
-        var repository = new FakeGracePeriodOrdersRepository();
-        repository.AddSubmittedOrder(12, placedAgo: TimeSpan.FromMinutes(2));
-        repository.AddSubmittedOrder(34, placedAgo: TimeSpan.FromMinutes(5));
-        repository.AddSubmittedOrder(56, placedAgo: TimeSpan.FromSeconds(30));
+        var repository = new StubGracePeriodOrdersRepository(12, 34);
         var eventBus = Substitute.For<IEventBus>();
         var service = new GracePeriodManagerService(
             Options.Create(new BackgroundTaskOptions
@@ -32,29 +30,27 @@ public class OrderProcessorTests
 
         await service.CheckConfirmedGracePeriodOrders(TestContext.CancellationToken);
 
+        Assert.AreEqual(TimeSpan.FromMinutes(1), repository.RequestedGracePeriod);
         await eventBus.Received(1).PublishAsync(
             Arg.Is<GracePeriodConfirmedIntegrationEvent>(e => e.OrderId == 12));
         await eventBus.Received(1).PublishAsync(
             Arg.Is<GracePeriodConfirmedIntegrationEvent>(e => e.OrderId == 34));
-        await eventBus.DidNotReceive().PublishAsync(
-            Arg.Is<GracePeriodConfirmedIntegrationEvent>(e => e.OrderId == 56));
+        await eventBus.Received(2).PublishAsync(Arg.Any<IntegrationEvent>());
     }
 
     /// <summary>
-    /// In-memory stand-in for the Postgres grace-period repository: holds Submitted Orders
-    /// with their age and returns those at least as old as the requested grace period.
-    /// The real SQL rule is covered against Postgres in OrderProcessor.FunctionalTests.
+    /// Canned-answer stub for the grace-period query port: returns the configured Order ids and
+    /// records the grace period it was asked for. The real SQL rule is covered against Postgres
+    /// in OrderProcessor.FunctionalTests.
     /// </summary>
-    private sealed class FakeGracePeriodOrdersRepository : IGracePeriodOrdersRepository
+    private sealed class StubGracePeriodOrdersRepository(params int[] orderIds) : IGracePeriodOrdersRepository
     {
-        private readonly Dictionary<int, TimeSpan> _submittedOrderAges = [];
+        public TimeSpan? RequestedGracePeriod { get; private set; }
 
-        public void AddSubmittedOrder(int orderId, TimeSpan placedAgo) => _submittedOrderAges[orderId] = placedAgo;
-
-        public ValueTask<List<int>> GetConfirmedGracePeriodOrdersAsync(TimeSpan gracePeriod, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(_submittedOrderAges
-                .Where(order => order.Value >= gracePeriod)
-                .Select(order => order.Key)
-                .ToList());
+        public ValueTask<List<int>> GetConfirmedGracePeriodOrdersAsync(TimeSpan gracePeriod, CancellationToken cancellationToken)
+        {
+            RequestedGracePeriod = gracePeriod;
+            return ValueTask.FromResult(orderIds.ToList());
+        }
     }
 }

@@ -14,6 +14,5 @@
 ## Comments
 
 - "Throws when no buyer id" was deleted: `BuyerAggregateTest.Create_buyer_item_fail` already covers it.
-- The handler takes `IMediator` but never uses it, so the test gives it a real MediatR mediator with nothing registered (`AddMediatR` over the test assembly) instead of a fake.
-- New fakes in `tests/Ordering.UnitTests/Application/Fakes.cs`: `FakeOrderRepository` (+ `FakeUnitOfWork` whose save can fail), `FakeOrderingIntegrationEventService`, `FakeIdentityService`. Deviation from the convention: `FakeOrderRepository` has no shared contract test against the real EF `OrderRepository` (that needs Postgres and wasn't in this ticket's scope); it only stores orders.
-- `GlobalUsings.cs` still imports NSubstitute because `IdentifiedCommandHandlerTest` and `OrdersWebApiTest` (tickets 05/06) use it; remove the using and the package once both are gone.
+- Review follow-up: the "returns false if the Order is not persisted" test (`NewOrderCommandHandlerTest`) and its fakes (`Application/Fakes.cs`) were deleted. The test asserted the handler passes through `UnitOfWork.SaveEntitiesAsync` returning `false`, but the real `OrderingContext.SaveEntitiesAsync` never returns false (it returns true or throws), so the fake invented a state the real adapter can't produce. Success is covered end-to-end by ticket 05's HTTP test; the real "save throws" path belongs to ticket 11.
+- NSubstitute (package references and `global using`) is removed from `Ordering.UnitTests`; nothing there uses it any more.
