@@ -292,6 +292,58 @@ public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
         return order.Id;
     }
 
+    [Fact]
+    public async Task PostingTheSameOrderTwiceWithOneRequestIdCreatesOneOrder()
+    {
+        // Arrange
+        var ordersBefore = await CountMyOrdersAsync();
+        var requestId = Guid.NewGuid();
+
+        // Act
+        var firstResponse = await PostOrderAsync(requestId);
+        var secondResponse = await PostOrderAsync(requestId);
+
+        // Assert: both requests succeed, but only one new Order exists for the Buyer.
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+        Assert.Equal(ordersBefore + 1, await CountMyOrdersAsync());
+    }
+
+    // Posts a one-item Order for the fixed test identity with the given x-requestid.
+    private Task<HttpResponseMessage> PostOrderAsync(Guid requestId)
+    {
+        var item = new BasketItem
+        {
+            Id = "1",
+            ProductId = 12,
+            ProductName = "Test",
+            UnitPrice = 10,
+            OldUnitPrice = 9,
+            Quantity = 1,
+            PictureUrl = null
+        };
+        // The request must pass validation: the endpoint answers 200 even when the command fails.
+        var request = new CreateOrderRequest(
+            UserId: AutoAuthorizeMiddleware.IDENTITY_ID, UserName: "TestUser",
+            City: "city", Street: "street", State: "state", Country: "country", ZipCode: "zipcode",
+            CardNumber: "XXXXXXXXXXXX0005", CardHolderName: "Test User", CardExpiration: DateTime.UtcNow.AddYears(1),
+            CardSecurityNumber: "123", CardTypeId: 1, Buyer: null, Items: new List<BasketItem> { item });
+        var content = new StringContent(JsonSerializer.Serialize(request), UTF8Encoding.UTF8, "application/json")
+        {
+            Headers = { { "x-requestid", requestId.ToString() } }
+        };
+        return _httpClient.PostAsync("api/orders", content, TestContext.Current.CancellationToken);
+    }
+
+    // Counts the Orders the API lists for the fixed test identity.
+    private async Task<int> CountMyOrdersAsync()
+    {
+        var response = await _httpClient.GetAsync("api/orders", TestContext.Current.CancellationToken);
+        response.EnsureSuccessStatusCode();
+        using var orders = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        return orders.RootElement.GetArrayLength();
+    }
+
     private CreateOrderDraftCommand FakeOrderDraftCommand()
     {
         return new CreateOrderDraftCommand(
