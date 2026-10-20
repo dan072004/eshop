@@ -25,7 +25,7 @@ Deleted (16):
 Kept (11):
 - `CatalogItemViewModelTests.AddCatalogItemCommandSendsAddProductMessageTest`: executing the command publishes a message.
 - `CatalogViewModelTests.SettingBadgeCountPropertyShouldRaisePropertyChanged`: initialisation updates the badge count.
-- `CatalogViewModelTests.ClearFilterCommandResetsPropertiesTest`: borderline, kept because it acts and asserts state; it is weak (no filter is set before clearing), worth strengthening when ClientApp work is scheduled.
+- `CatalogViewModelTests.ClearFilterCommandResetsPropertiesTest`: kept and strengthened in review follow-up. It now selects a brand and a type, applies the filter and opens the filter panel, then clears and asserts the selected brand/type are null, no brand/type is marked selected, `IsFiltering` is false and the full catalogue is back. Strengthening it exposed a bug: `ClearFilterAsync` only cleared the brand/type `Selected` flags and left `SelectedBrand`/`SelectedType` set; it now nulls them. Mutation-checked: with a no-op `ClearFilterAsync` the test fails.
 - `OrderViewModelTests.OrderPropertyIsNotNullAfterViewModelInitializationTest`: borderline, kept because `Order` starts null and only `InitializeAsync` loads it, so it fails if loading breaks.
 - `OrderViewModelTests.SettingOrderPropertyShouldRaisePropertyChanged`.
 - `MockViewModelTests` (6 tests): exercise the app's `ValidatableObject` validation rules and change notification.

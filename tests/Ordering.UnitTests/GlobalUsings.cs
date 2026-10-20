@@ -14,7 +14,6 @@ global using eShop.Ordering.Domain.Exceptions;
 global using eShop.Ordering.Domain.SeedWork;
 global using eShop.Ordering.Infrastructure.Idempotency;
 global using Microsoft.Extensions.Logging;
-global using NSubstitute;
 global using eShop.Ordering.UnitTests;
 global using Microsoft.VisualStudio.TestTools.UnitTesting;
 
