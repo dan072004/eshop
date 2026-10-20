@@ -16,5 +16,6 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Application.UnitTests" />
+    <InternalsVisibleTo Include="OrderProcessor.FunctionalTests" />
   </ItemGroup>
 </Project>
