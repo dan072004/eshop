@@ -357,6 +357,23 @@ public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
         Assert.Equal(ordersBefore + 1, await CountMyOrdersAsync());
     }
 
+    [Fact]
+    public async Task PostingTwoOrdersWithDifferentRequestIdCreatesTwoOrders()
+    {
+        // Arrange
+        var ordersBefore = await CountMyOrdersAsync();
+        var requestId = Guid.NewGuid();
+
+        // Act
+        var firstResponse = await PostOrderAsync(requestId);
+        var secondResponse = await PostOrderAsync(Guid.NewGuid());
+
+        // Assert: a new request id is a new Order, even with identical contents.
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+        Assert.Equal(ordersBefore + 2, await CountMyOrdersAsync());
+    }
+
     // Posts a one-item Order for the fixed test identity with the given x-requestid.
     private Task<HttpResponseMessage> PostOrderAsync(Guid requestId)
     {
