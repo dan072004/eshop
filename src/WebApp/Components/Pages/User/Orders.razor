@@ -28,12 +28,17 @@ else if (orders.Length == 0)
 }
 else
 {
+    @if (cancelError is not null)
+    {
+        <p class="orders-error" role="alert">@cancelError</p>
+    }
     <ul class="orders-list">
         <li class="orders-header orders-item">
             <div>Number</div>
             <div>Date</div>
             <div class="total-header">Total</div>
             <div>Status</div>
+            <div class="order-actions"></div>
         </li>
         @foreach (var order in orders)
         {
@@ -52,17 +57,59 @@ else
                         @order.Status
                     </span>
                 </div>
+                <div class="order-actions">
+                    @if (IsCancellable(order.Status))
+                    {
+                        <form method="post" data-enhance onsubmit="return confirm('Cancel order #@(order.OrderNumber)? This can\'t be undone.')">
+                            <input type="hidden" name="_handler" value="cancel-order" />
+                            <AntiforgeryToken />
+                            <button type="submit" class="button button-ghost order-cancel" name="CancelOrderNumber" value="@order.OrderNumber"
+                                    aria-label="Cancel order @order.OrderNumber">
+                                Cancel
+                            </button>
+                        </form>
+                    }
+                </div>
             </li>
         }
     </ul>
 }
 </div>
 
+<form @formname="cancel-order" @onsubmit="@CancelOrderAsync"></form>
+
 @code {
     private OrderRecord[]? orders;
+    private string? cancelError;
+
+    [SupplyParameterFromForm]
+    public int? CancelOrderNumber { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
+        orders = await OrderingService.GetOrders();
+    }
+
+    // Mirrors Order.SetCancelledStatus in Ordering.Domain: paid or shipped orders can't be cancelled.
+    private static bool IsCancellable(string status)
+        => status is "Submitted" or "AwaitingValidation" or "StockConfirmed";
+
+    private async Task CancelOrderAsync()
+    {
+        if (CancelOrderNumber is not { } orderNumber)
+        {
+            return;
+        }
+
+        try
+        {
+            await OrderingService.CancelOrder(orderNumber, Guid.NewGuid());
+        }
+        catch (HttpRequestException)
+        {
+            cancelError = $"Order #{orderNumber} couldn't be cancelled. It may already have been paid or shipped.";
+        }
+
         orders = await OrderingService.GetOrders();
     }
 }

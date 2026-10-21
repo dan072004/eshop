@@ -46,8 +46,14 @@ public class OrderQueries(OrderingContext context)
                 Total =(double) o.OrderItems.Sum(oi => oi.UnitPrice* oi.Units)
             })
             .ToListAsync();
-    } 
-    
+    }
+
+    public Task<bool> IsOrderOwnedByUserAsync(int orderId, string userId)
+    {
+        return context.Orders
+            .AnyAsync(o => o.Id == orderId && o.Buyer.IdentityGuid == userId);
+    }
+
     public async Task<IEnumerable<CardType>> GetCardTypesAsync() => 
         await context.CardTypes.Select(c=> new CardType { Id = c.Id, Name = c.Name }).ToListAsync();
 }

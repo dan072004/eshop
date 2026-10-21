@@ -25,6 +25,8 @@ public class OrdersWebApiTest
     public async Task Cancel_order_with_requestId_success()
     {
         // Arrange
+        _identityServiceMock.GetUserIdentity().Returns("user-1");
+        _orderQueriesMock.IsOrderOwnedByUserAsync(1, "user-1").Returns(Task.FromResult(true));
         _mediatorMock.Send(Arg.Any<IdentifiedCommand<CancelOrderCommand, bool>>(), default)
             .Returns(Task.FromResult(true));
 
@@ -34,6 +36,22 @@ public class OrdersWebApiTest
 
         // Assert
         Assert.IsInstanceOfType<Ok>(result.Result);
+    }
+
+    [TestMethod]
+    public async Task Cancel_order_not_owned_by_user_returns_not_found()
+    {
+        // Arrange
+        _identityServiceMock.GetUserIdentity().Returns("user-1");
+        _orderQueriesMock.IsOrderOwnedByUserAsync(1, "user-1").Returns(Task.FromResult(false));
+
+        // Act
+        var orderServices = new OrderServices(_mediatorMock, _orderQueriesMock, _identityServiceMock, _loggerMock);
+        var result = await OrdersApi.CancelOrderAsync(Guid.NewGuid(), new CancelOrderCommand(1), orderServices);
+
+        // Assert
+        Assert.IsInstanceOfType<NotFound>(result.Result);
+        await _mediatorMock.DidNotReceive().Send(Arg.Any<IdentifiedCommand<CancelOrderCommand, bool>>(), Arg.Any<CancellationToken>());
     }
 
     [TestMethod]
@@ -108,6 +126,8 @@ public class OrdersWebApiTest
         // Arrange
         var fakeOrderId = 123;
         var fakeDynamicResult = new Order();
+        _identityServiceMock.GetUserIdentity().Returns("user-1");
+        _orderQueriesMock.IsOrderOwnedByUserAsync(fakeOrderId, "user-1").Returns(Task.FromResult(true));
         _orderQueriesMock.GetOrderAsync(Arg.Any<int>())
             .Returns(Task.FromResult(fakeDynamicResult));
 
@@ -125,6 +145,8 @@ public class OrdersWebApiTest
     {
         // Arrange
         var fakeOrderId = 123;
+        _identityServiceMock.GetUserIdentity().Returns("user-1");
+        _orderQueriesMock.IsOrderOwnedByUserAsync(fakeOrderId, "user-1").Returns(Task.FromResult(true));
 #pragma warning disable NS5003
         _orderQueriesMock.GetOrderAsync(Arg.Any<int>())
             .Throws(new KeyNotFoundException());
@@ -136,6 +158,23 @@ public class OrdersWebApiTest
 
         // Assert
         Assert.IsInstanceOfType<NotFound>(result.Result);
+    }
+
+    [TestMethod]
+    public async Task Get_order_not_owned_by_user_returns_not_found()
+    {
+        // Arrange
+        var fakeOrderId = 123;
+        _identityServiceMock.GetUserIdentity().Returns("user-1");
+        _orderQueriesMock.IsOrderOwnedByUserAsync(fakeOrderId, "user-1").Returns(Task.FromResult(false));
+
+        // Act
+        var orderServices = new OrderServices(_mediatorMock, _orderQueriesMock, _identityServiceMock, _loggerMock);
+        var result = await OrdersApi.GetOrderAsync(fakeOrderId, orderServices);
+
+        // Assert
+        Assert.IsInstanceOfType<NotFound>(result.Result);
+        await _orderQueriesMock.DidNotReceive().GetOrderAsync(Arg.Any<int>());
     }
 
     [TestMethod]
@@ -157,6 +196,8 @@ public class OrdersWebApiTest
     [TestMethod]
     public async Task Cancel_order_returns_problem_when_command_fails()
     {
+        _identityServiceMock.GetUserIdentity().Returns("user-1");
+        _orderQueriesMock.IsOrderOwnedByUserAsync(1, "user-1").Returns(Task.FromResult(true));
         _mediatorMock.Send(Arg.Any<IdentifiedCommand<CancelOrderCommand, bool>>(), default)
             .Returns(Task.FromResult(false));
         var services = new OrderServices(_mediatorMock, _orderQueriesMock, _identityServiceMock, _loggerMock);
