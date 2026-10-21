@@ -148,6 +148,6 @@ The work comes in two batches:
 
 ## Further Notes
 
-- The decisions come from a grilling session on 2026-10-20, recorded in `docs/refactoring/test-strategy-mocks-to-seams-2026-10-20.md`.
+- The decisions come from a grilling session on 2026-10-20. They are recorded in **Implementation Decisions** above and in `docs/adr/0002-fakes-with-contract-tests-instead-of-mocks.md` and `docs/adr/0003-delete-shape-only-tests.md`.
 - When coupons resumes, ticket 03 can replace the ownership tests' seed-for-another-identity approach with acting as that user. The tests' assertions don't change.
 - The reverted coupons ticket 01 also took away the domain and functional discount tests. Bring them back when ticket 01 is reimplemented, written to this convention.
