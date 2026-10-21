@@ -72,7 +72,7 @@ The work comes in two batches:
   - Redis basket repository (real adapter).
   - The Order aggregate test that checks the total of two identical items with a literal expected value (domain).
   - The webhook client test that fakes only the HTTP handler (boundary).
-- The convention is not recorded as an ADR, because it is cheap to reverse.
+- The convention was first left out of the ADRs as cheap to reverse. After the fakes, contracts and subclasses landed in several projects, it was recorded in `docs/adr/0002-fakes-with-contract-tests-instead-of-mocks.md`.
 
 **Ordering ownership (batch 1)**
 - The Ordering functional tests get a seed helper. It writes a Buyer and an Order for a given owner identity directly through the Ordering database context, and returns the Order number.
@@ -107,7 +107,7 @@ The work comes in two batches:
 **Weak assertions (batch 2)**
 - The domain test that creates an Order item asserts the item's units, unit price, discount and product. (The coupons test that previously covered this was reverted.)
 - The functional test that gets all stored Orders seeds an Order and asserts that it is in the list.
-- The ClientApp shape-only tests are deleted, with no replacements until ClientApp work is scheduled.
+- The ClientApp shape-only tests are deleted, with no replacements until ClientApp work is scheduled. The reasoning is recorded in `docs/adr/0003-delete-shape-only-tests.md`.
 
 **Speed (batch 2)**
 - Functional fixtures may move to shared xUnit collection or assembly fixtures.
@@ -130,6 +130,10 @@ The work comes in two batches:
   - Ordering functional tests that seed through the database context and then assert over HTTP.
   - Webhook tests that fake only the HTTP handler.
   - Order aggregate tests with literal expected totals.
+- **External prior art** (full list in ADR 0002):
+  - J.B. Rainsberger, "Integrated Tests Are a Scam": collaboration tests paired with contract tests, the shape of the basket contract.
+  - *Software Engineering at Google*, chapter 13 "Test Doubles": prefer fakes, and test them against the real implementation.
+  - Freeman and Pryce, *Growing Object-Oriented Software, Guided by Tests*: "Don't mock types you don't own".
 - **No new seams are introduced.** Every seam above already exists.
 
 ## Out of Scope
