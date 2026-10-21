@@ -24,7 +24,7 @@ npm run test:e2e                             # Playwright journeys in e2e/; star
 ```
 
 - Tests run on **Microsoft.Testing.Platform** (`global.json` `"test.runner"`), so use `--project` / `--solution`. VSTest-only flags such as `-nologo` fail.
-- Unit tests (`*.UnitTests`) use MSTest.Sdk with NSubstitute. Functional tests (`*.FunctionalTests`) use xUnit v3 and start real Postgres/Redis/Identity containers through an Aspire `DistributedApplication` inside a `WebApplicationFactory` fixture. Ordering functional tests skip auth with `AutoAuthorizeMiddleware`.
+- Unit tests (`*.UnitTests`) use MSTest.Sdk. Functional tests (`*.FunctionalTests`) use xUnit v3 and start real Postgres/Redis/Identity containers through an Aspire `DistributedApplication` inside a `WebApplicationFactory` fixture. Ordering functional tests skip auth with `AutoAuthorizeMiddleware`. Which kind to write: see **Testing** below.
 - `TreatWarningsAsErrors` is on for the whole repo, so warnings break the build.
 - Build output goes to `artifacts/` (`UseArtifactsOutput`). While the app runs, its DLLs are locked; to build or test without stopping it, add `--artifacts-path <some other dir>`.
 - Playwright CI sets `ESHOP_USE_HTTP_ENDPOINTS=1`, which makes the AppHost use plain-HTTP launch profiles, and logs in with `USERNAME1`/`PASSWORD` (seeded users such as `alice` / `bob`, password `Pass123$`).
@@ -58,6 +58,25 @@ WebApp also subscribes to the status-change events so it can push live updates (
 - `WebApp`: Blazor Web App using static SSR with enhanced navigation and forms (`@formname`, `[SupplyParameterFromForm]`, `data-enhance`). Shared UI lives in `WebAppComponents`. Styling uses design tokens (CSS custom properties such as `--color-danger`, `--text-sm`, `--radius-md`) and per-component `.razor.css` files.
 - Catalog.API supports API versioning (v1/v2) and optional AI semantic search with embeddings: set `UseFoundry=true` to provision Microsoft Foundry. The generated OpenAPI documents (`Catalog.API*.json`) are checked in.
 - `ClientApp` (MAUI) and `HybridApp` are outside `eShop.Web.slnf` and have their own CI workflow.
+
+## Testing
+
+Test behaviour through a public **seam** (an HTTP endpoint, a repository interface, an aggregate's methods) and assert on what comes out: the response, the stored value read back, the published event. Pick the seam by where the behaviour lives:
+
+| Where the behaviour lives | How to test it |
+|---|---|
+| Inside the infrastructure call (a SQL/EF query, a Redis script, serialisation) | Against the real thing in a functional test, at the HTTP or repository seam |
+| Above infrastructure that only stores or transports data | Fast test with an in-memory **fake** at that seam |
+| In a system we don't own (RabbitMQ `IEventBus`, outbound HTTP, clock, framework types) | Fake or NSubstitute at that boundary only |
+| Nowhere near infrastructure (domain aggregates) | Plain fast test |
+
+- NSubstitute is for boundaries we don't own. Our own types (`IMediator`, handlers, query and repository interfaces) are used for real, or replaced by a fake. Assert on outcomes read back through the seam; `Received(...)` belongs only on a boundary such as `IEventBus`.
+- A fake is a small working implementation (e.g. a `Dictionary`-backed repository) that is allowed only when the real adapter just persists. Every fake runs the same contract tests as its real adapter, so it can't drift. A fake may only give answers the real adapter can give. A canned-answer stub for a query port needs no contract test; a fake that implements logic does.
+- Behaviour inside an adapter, like the ownership filter in Ordering's `OrderQueries` or the grace-period SQL in OrderProcessor, is tested against the real database.
+- Endpoints are tested only through HTTP in the functional tests, where the current user comes from the test auth middleware. The current user (`IIdentityService`) is not a boundary, and endpoint methods such as `OrdersApi.CancelOrderAsync` are not called directly from unit tests.
+- When a test replaces a mock-based one, delete the old test in the same change.
+
+Reference examples: `WebhooksApiTests.SubscriptionLifecyclePersistsAndIsScopedToUser` (HTTP), `RedisBasketRepositoryTests` (real adapter), `OrderAggregateTest.when_add_two_times_on_the_same_item_then_the_total_of_order_should_be_the_sum_of_the_two_items` (domain), `WebhookTests` (fakes only the outbound `HttpMessageHandler`).
 
 ## Repo skills
 

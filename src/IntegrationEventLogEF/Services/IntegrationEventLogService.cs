@@ -1,20 +1,26 @@
-﻿namespace eShop.IntegrationEventLogEF.Services;
+﻿using System.Collections.Concurrent;
+
+namespace eShop.IntegrationEventLogEF.Services;
 
 public class IntegrationEventLogService<TContext> : IIntegrationEventLogService, IDisposable
     where TContext : DbContext
 {
     private volatile bool _disposedValue;
     private readonly TContext _context;
-    private readonly Type[] _eventTypes;
 
     public IntegrationEventLogService(TContext context)
     {
         _context = context;
-        _eventTypes = Assembly.Load(Assembly.GetEntryAssembly().FullName)
-            .GetTypes()
-            .Where(t => t.Name.EndsWith(nameof(IntegrationEvent)))
-            .ToArray();
     }
+
+    // Resolves by full name across loaded assemblies rather than the entry assembly, which is
+    // the test host (not the service) when running under WebApplicationFactory.
+    private static readonly ConcurrentDictionary<string, Type> s_eventTypes = new();
+
+    private static Type ResolveEventType(string eventTypeName) =>
+        s_eventTypes.GetOrAdd(eventTypeName, name => AppDomain.CurrentDomain.GetAssemblies()
+            .Select(assembly => assembly.GetType(name))
+            .FirstOrDefault(type => type is not null && typeof(IntegrationEvent).IsAssignableFrom(type)));
 
     public async Task<IEnumerable<IntegrationEventLogEntry>> RetrieveEventLogsPendingToPublishAsync(Guid transactionId)
     {
@@ -25,7 +31,7 @@ public class IntegrationEventLogService<TContext> : IIntegrationEventLogService,
         if (result.Count != 0)
         {
             return result.OrderBy(o => o.CreationTime)
-                .Select(e => e.DeserializeJsonContent(_eventTypes.FirstOrDefault(t => t.Name == e.EventTypeShortName)));
+                .Select(e => e.DeserializeJsonContent(ResolveEventType(e.EventTypeName)));
         }
 
         return [];

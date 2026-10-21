@@ -27,92 +27,6 @@ public class CatalogViewModelTests
 
         _appEnvironmentService.UpdateDependencies(true);
     }
-    
-    [TestMethod]
-    public void FilterCommandIsNotNullTest()
-    {
-        var catalogViewModel = new CatalogViewModel(_appEnvironmentService, _navigationService);
-        Assert.IsNotNull(catalogViewModel.FilterCommand);
-    }
-
-    [TestMethod]
-    public void ClearFilterCommandIsNotNullTest()
-    {
-        var catalogViewModel = new CatalogViewModel(_appEnvironmentService, _navigationService);
-        Assert.IsNotNull(catalogViewModel.ClearFilterCommand);
-    }
-
-    [TestMethod]
-    public void ProductsPropertyIsEmptyWhenViewModelInstantiatedTest()
-    {
-        var catalogViewModel = new CatalogViewModel(_appEnvironmentService, _navigationService);
-        Assert.IsEmpty(catalogViewModel.Products);
-    }
-
-    [TestMethod]
-    public void BrandsPropertyIsEmptyWhenViewModelInstantiatedTest()
-    {
-        var catalogViewModel = new CatalogViewModel(_appEnvironmentService, _navigationService);
-        Assert.IsEmpty(catalogViewModel.Brands);
-    }
-
-    [TestMethod]
-    public void BrandPropertyIsNullWhenViewModelInstantiatedTest()
-    {
-        var catalogViewModel = new CatalogViewModel(_appEnvironmentService, _navigationService);
-        Assert.IsNull(catalogViewModel.SelectedBrand);
-    }
-
-    [TestMethod]
-    public void TypesPropertyIsEmptyWhenViewModelInstantiatedTest()
-    {
-        var catalogViewModel = new CatalogViewModel(_appEnvironmentService, _navigationService);
-        Assert.IsEmpty(catalogViewModel.Types);
-    }
-
-    [TestMethod]
-    public void TypePropertyIsNullWhenViewModelInstantiatedTest()
-    {
-        var catalogViewModel = new CatalogViewModel(_appEnvironmentService, _navigationService);
-        Assert.IsNull(catalogViewModel.SelectedType);
-    }
-
-    [TestMethod]
-    public void IsFilterPropertyIsFalseWhenViewModelInstantiatedTest()
-    {
-        var catalogViewModel = new CatalogViewModel(_appEnvironmentService, _navigationService);
-        Assert.IsFalse(catalogViewModel.IsFiltering);
-    }
-
-    [TestMethod]
-    public async Task ProductsPropertyIsNotNullAfterViewModelInitializationTest()
-    {
-        var catalogViewModel = new CatalogViewModel(_appEnvironmentService, _navigationService);
-
-        await catalogViewModel.InitializeAsync();
-
-        Assert.IsNotNull(catalogViewModel.Products);
-    }
-
-    [TestMethod]
-    public async Task BrandsPropertyIsNotNullAfterViewModelInitializationTest()
-    {
-        var catalogViewModel = new CatalogViewModel(_appEnvironmentService, _navigationService);
-
-        await catalogViewModel.InitializeAsync();
-
-        Assert.IsNotNull(catalogViewModel.Brands);
-    }
-
-    [TestMethod]
-    public async Task TypesPropertyIsNotNullAfterViewModelInitializationTest()
-    {
-        var catalogViewModel = new CatalogViewModel(_appEnvironmentService, _navigationService);
-
-        await catalogViewModel.InitializeAsync();
-
-        Assert.IsNotNull(catalogViewModel.Types);
-    }
 
     [TestMethod]
     public async Task SettingBadgeCountPropertyShouldRaisePropertyChanged()
@@ -137,12 +51,22 @@ public class CatalogViewModelTests
     public async Task ClearFilterCommandResetsPropertiesTest()
     {
         var catalogViewModel = new CatalogViewModel(_appEnvironmentService, _navigationService);
-
         await catalogViewModel.InitializeAsync();
+        var allProductCount = catalogViewModel.Products.Count;
+        catalogViewModel.SelectCatalogBrand(catalogViewModel.Brands[0].Value);
+        catalogViewModel.SelectCatalogType(catalogViewModel.Types[0].Value);
+        await catalogViewModel.ApplyFilterCommand.ExecuteUntilComplete(null);
+        catalogViewModel.FilterCommand.Execute(null);
+        Assert.IsLessThan(allProductCount, catalogViewModel.Products.Count);
+        Assert.IsTrue(catalogViewModel.IsFiltering);
+
         await catalogViewModel.ClearFilterCommand.ExecuteUntilComplete(null);
 
         Assert.IsNull(catalogViewModel.SelectedBrand);
         Assert.IsNull(catalogViewModel.SelectedType);
-        Assert.IsNotNull(catalogViewModel.Products);
+        Assert.IsFalse(catalogViewModel.Brands.Any(brand => brand.Selected));
+        Assert.IsFalse(catalogViewModel.Types.Any(type => type.Selected));
+        Assert.IsFalse(catalogViewModel.IsFiltering);
+        Assert.HasCount(allProductCount, catalogViewModel.Products);
     }
 }
