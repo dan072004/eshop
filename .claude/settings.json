@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify-gate.ps1\" || { echo 'verify-gate hook failed to run; do not commit until it works' >&2; exit 2; }",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
