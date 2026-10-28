@@ -58,20 +58,34 @@ public partial class CatalogContextSeed(
                 PictureFileName = $"{source.Id}.webp",
             }).ToArray();
 
-            if (catalogAI.IsEnabled)
-            {
-                logger.LogInformation("Generating {NumItems} embeddings", catalogItems.Length);
-                IReadOnlyList<Vector>? embeddings = await catalogAI.GetEmbeddingsAsync(catalogItems);
-                for (int i = 0; i < catalogItems.Length; i++)
-                {
-                    catalogItems[i].Embedding = embeddings?[i];
-                }
-            }
-
             await context.CatalogItems.AddRangeAsync(catalogItems);
             logger.LogInformation("Seeded catalog with {NumItems} items", context.CatalogItems.Count());
             await context.SaveChangesAsync();
         }
+
+        if (catalogAI.IsEnabled)
+        {
+            await AddMissingEmbeddingsAsync(context);
+        }
+    }
+
+    // Postgres outlives the app, so items seeded or added while AI was off would otherwise never be found by semantic search.
+    private async Task AddMissingEmbeddingsAsync(CatalogContext context)
+    {
+        var itemsWithoutEmbedding = await context.CatalogItems.Where(item => item.Embedding == null).ToArrayAsync();
+        if (itemsWithoutEmbedding.Length == 0)
+        {
+            return;
+        }
+
+        logger.LogInformation("Generating {NumItems} embeddings", itemsWithoutEmbedding.Length);
+        IReadOnlyList<Vector>? embeddings = await catalogAI.GetEmbeddingsAsync(itemsWithoutEmbedding);
+        for (int i = 0; i < itemsWithoutEmbedding.Length; i++)
+        {
+            itemsWithoutEmbedding[i].Embedding = embeddings?[i];
+        }
+
+        await context.SaveChangesAsync();
     }
 
     private class CatalogSourceEntry
