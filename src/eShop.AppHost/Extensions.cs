@@ -56,10 +56,10 @@ internal static class Extensions
         var embeddingProvider = ParseSelector<EmbeddingProvider>(builder.Configuration, "EmbeddingProvider");
 
         IResourceBuilder<FoundryResource>? foundry = null;
-        IResourceBuilder<FoundryResource> Foundry() => foundry ??= builder.AddFoundry("foundry");
+        IResourceBuilder<FoundryResource> GetOrAddFoundry() => foundry ??= builder.AddFoundry("foundry");
 
         IResourceBuilder<OllamaResource>? ollama = null;
-        IResourceBuilder<OllamaResource> Ollama() => ollama ??= builder.AddOllama("ollama")
+        IResourceBuilder<OllamaResource> GetOrAddOllama() => ollama ??= builder.AddOllama("ollama")
             .WithDataVolume()
             .WithGPUSupport()
             .WithOpenWebUI();
@@ -68,11 +68,11 @@ internal static class Extensions
         switch (chatProvider)
         {
             case ChatProvider.Foundry:
-                var chatDeployment = Foundry().AddDeployment("chatModel", "gpt-4.1-mini", "2025-04-14", "OpenAI");
+                var chatDeployment = GetOrAddFoundry().AddDeployment("chatModel", "gpt-4.1-mini", "2025-04-14", "OpenAI");
                 webApp.WithReference(chatDeployment).WaitFor(chatDeployment);
                 break;
             case ChatProvider.Ollama:
-                var chatModel = Ollama().AddModel("chat", "llama3.1");
+                var chatModel = GetOrAddOllama().AddModel("chat", "llama3.1");
                 webApp.WithReference(chatModel).WaitFor(chatModel);
                 break;
             case ChatProvider.Claude:
@@ -87,11 +87,11 @@ internal static class Extensions
         switch (embeddingProvider)
         {
             case EmbeddingProvider.Foundry:
-                var embeddingDeployment = Foundry().AddDeployment("textEmbeddingModel", "text-embedding-3-small", "1", "OpenAI");
+                var embeddingDeployment = GetOrAddFoundry().AddDeployment("textEmbeddingModel", "text-embedding-3-small", "1", "OpenAI");
                 catalogApi.WithReference(embeddingDeployment).WaitFor(embeddingDeployment);
                 break;
             case EmbeddingProvider.Ollama:
-                var embeddingModel = Ollama().AddModel("embedding", "all-minilm");
+                var embeddingModel = GetOrAddOllama().AddModel("embedding", "all-minilm");
                 catalogApi.WithReference(embeddingModel)
                     .WithEnvironment("OllamaEnabled", "true")
                     .WaitFor(embeddingModel);

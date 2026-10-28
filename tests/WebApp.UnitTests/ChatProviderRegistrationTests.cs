@@ -85,8 +85,7 @@ public class ChatProviderRegistrationTests
         {
             ["ChatProvider"] = "Claude",
             ["ANTHROPIC_API_KEY"] = "not-a-real-key",
-            ["Claude:ModelId"] = "claude-sonnet-4-5",
-            ["Claude:MaxOutputTokens"] = "2048"
+            ["Claude:ModelId"] = "claude-sonnet-4-5"
         });
 
         var metadata = services.GetRequiredService<IChatClient>().GetService<ChatClientMetadata>();
@@ -106,6 +105,25 @@ public class ChatProviderRegistrationTests
         var exception = Assert.ThrowsExactly<InvalidOperationException>(builder.AddChatProvider);
 
         Assert.Contains("ANTHROPIC_API_KEY", exception.Message);
+    }
+
+    [TestMethod]
+    [DataRow("lots", DisplayName = "non-numeric")]
+    [DataRow("0", DisplayName = "zero")]
+    [DataRow("-1", DisplayName = "negative")]
+    public void ClaudeChatProviderWithAnInvalidMaxOutputTokensFailsAtStartupNamingTheSetting(string maxOutputTokens)
+    {
+        var builder = CreateBuilder(new()
+        {
+            ["ChatProvider"] = "Claude",
+            ["ANTHROPIC_API_KEY"] = "not-a-real-key",
+            ["Claude:MaxOutputTokens"] = maxOutputTokens
+        });
+
+        var exception = Assert.ThrowsExactly<InvalidOperationException>(builder.AddChatProvider);
+
+        Assert.Contains("Claude:MaxOutputTokens", exception.Message);
+        Assert.Contains($"'{maxOutputTokens}'", exception.Message);
     }
 
     [TestMethod]

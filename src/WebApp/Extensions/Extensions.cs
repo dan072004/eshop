@@ -1,4 +1,5 @@
-﻿using Anthropic;
+﻿using System.Globalization;
+using Anthropic;
 using Anthropic.Core;
 using eShop.Basket.API.Grpc;
 using eShop.WebApp.Services.OrderStatus.IntegrationEvents;
@@ -103,25 +104,36 @@ public static class Extensions
     /// </exception>
     public static void AddChatProvider(this IHostApplicationBuilder builder)
     {
-        const string Setting = "ChatProvider";
-        string[] allowed = ["None", "Ollama", "Foundry", "Claude"];
-
-        var value = builder.Configuration[Setting];
-        var chatProvider = string.IsNullOrWhiteSpace(value)
-            ? "None"
-            : allowed.FirstOrDefault(name => string.Equals(name, value.Trim(), StringComparison.OrdinalIgnoreCase))
-                ?? throw new InvalidOperationException(
-                    $"The {Setting} setting has the unknown value '{value}'. Allowed values: {string.Join(", ", allowed)}.");
-
-        var chatClientBuilder = chatProvider switch
+        var chatClientBuilder = GetChatProvider(builder.Configuration) switch
         {
-            "Ollama" => builder.AddOllamaApiClient("chat").AddChatClient(),
-            "Foundry" => builder.AddOpenAIClientFromConfiguration("chatModel").AddChatClient(),
-            "Claude" => builder.AddClaudeChatClient(),
+            ChatProvider.Ollama => builder.AddOllamaApiClient("chat").AddChatClient(),
+            ChatProvider.Foundry => builder.AddOpenAIClientFromConfiguration("chatModel").AddChatClient(),
+            ChatProvider.Claude => builder.AddClaudeChatClient(),
             _ => null
         };
 
         chatClientBuilder?.UseFunctionInvocation();
+    }
+
+    private enum ChatProvider { None, Ollama, Foundry, Claude }
+
+    // Matches names only (case-insensitively), so a numeric string such as "1" is rejected rather than cast.
+    private static ChatProvider GetChatProvider(IConfiguration configuration)
+    {
+        const string Setting = "ChatProvider";
+
+        var value = configuration[Setting];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return ChatProvider.None;
+        }
+
+        var allowed = Enum.GetNames<ChatProvider>();
+        var name = allowed.FirstOrDefault(n => string.Equals(n, value.Trim(), StringComparison.OrdinalIgnoreCase));
+        return name is not null
+            ? Enum.Parse<ChatProvider>(name)
+            : throw new InvalidOperationException(
+                $"The {Setting} setting has the unknown value '{value}'. Allowed values: {string.Join(", ", allowed)}.");
     }
 
     // There is no Aspire client integration for Anthropic, so the client is built from the official SDK.
@@ -140,7 +152,7 @@ public static class Extensions
         // Defaults suit a quick shopping helper; override them under Claude:ModelId and Claude:MaxOutputTokens.
         var claude = builder.Configuration.GetSection("Claude");
         var modelId = claude["ModelId"] is { Length: > 0 } configuredModelId ? configuredModelId : "claude-haiku-4-5";
-        var maxOutputTokens = claude.GetValue("MaxOutputTokens", 1024);
+        var maxOutputTokens = GetMaxOutputTokens(claude["MaxOutputTokens"]);
 
         var chatClient = new AnthropicClient(new ClientOptions { ApiKey = apiKey })
             .AsIChatClient(modelId, maxOutputTokens);
@@ -148,6 +160,19 @@ public static class Extensions
         // The adapter has no "off" thinking mode; ReasoningEffort.None is what makes it send thinking.type=disabled.
         return builder.Services.AddChatClient(chatClient)
             .ConfigureOptions(options => options.Reasoning ??= new ReasoningOptions { Effort = ReasoningEffort.None });
+    }
+
+    private static int GetMaxOutputTokens(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return 1024;
+        }
+
+        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var maxOutputTokens) && maxOutputTokens > 0
+            ? maxOutputTokens
+            : throw new InvalidOperationException(
+                $"The Claude:MaxOutputTokens setting has the invalid value '{value}'. It must be a positive whole number.");
     }
 
     public static async Task<string?> GetBuyerIdAsync(this AuthenticationStateProvider authenticationStateProvider)

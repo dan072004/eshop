@@ -86,7 +86,7 @@ public class AppHostConfigurationTests
 
         var webAppEnvironment = await EnvironmentOf(app, app.WebApp);
         Assert.AreEqual(expectedChatProvider, webAppEnvironment["ChatProvider"]);
-        Assert.IsTrue(webAppEnvironment.ContainsKey($"ConnectionStrings__{chatResource}"));
+        Assert.AreEqual($"{{{chatResource}.connectionString}}", webAppEnvironment[$"ConnectionStrings__{chatResource}"]);
 
         var catalogEnvironment = await EnvironmentOf(app, app.Catalog);
         Assert.IsFalse(catalogEnvironment.ContainsKey("OllamaEnabled"));
@@ -132,7 +132,7 @@ public class AppHostConfigurationTests
         Assert.IsFalse(HasConnectionString(webAppEnvironment));
 
         var catalogEnvironment = await EnvironmentOf(app, app.Catalog);
-        Assert.IsTrue(catalogEnvironment.ContainsKey($"ConnectionStrings__{embeddingResource}"));
+        Assert.AreEqual($"{{{embeddingResource}.connectionString}}", catalogEnvironment[$"ConnectionStrings__{embeddingResource}"]);
         Assert.AreEqual(expectedOllamaEnabled, catalogEnvironment.GetValueOrDefault("OllamaEnabled"));
         Assert.IsFalse(catalogEnvironment.ContainsKey("ANTHROPIC_API_KEY"));
     }
@@ -165,7 +165,7 @@ public class AppHostConfigurationTests
             app.AddedResources);
 
         var catalogEnvironment = await EnvironmentOf(app, app.Catalog);
-        Assert.IsTrue(catalogEnvironment.ContainsKey($"ConnectionStrings__{embeddingResource}"));
+        Assert.AreEqual($"{{{embeddingResource}.connectionString}}", catalogEnvironment[$"ConnectionStrings__{embeddingResource}"]);
         Assert.AreEqual(expectedOllamaEnabled, catalogEnvironment.GetValueOrDefault("OllamaEnabled"));
 
         var webAppEnvironment = await EnvironmentOf(app, app.WebApp);
@@ -184,11 +184,11 @@ public class AppHostConfigurationTests
 
         var webAppEnvironment = await EnvironmentOf(app, app.WebApp);
         Assert.AreEqual("Foundry", webAppEnvironment["ChatProvider"]);
-        Assert.IsTrue(webAppEnvironment.ContainsKey("ConnectionStrings__chatModel"));
+        Assert.AreEqual("{chatModel.connectionString}", webAppEnvironment["ConnectionStrings__chatModel"]);
 
         var catalogEnvironment = await EnvironmentOf(app, app.Catalog);
         Assert.AreEqual("true", catalogEnvironment["OllamaEnabled"]);
-        Assert.IsTrue(catalogEnvironment.ContainsKey("ConnectionStrings__embedding"));
+        Assert.AreEqual("{embedding.connectionString}", catalogEnvironment["ConnectionStrings__embedding"]);
     }
 
     [TestMethod]
@@ -202,11 +202,11 @@ public class AppHostConfigurationTests
 
         var webAppEnvironment = await EnvironmentOf(app, app.WebApp);
         Assert.AreEqual("Ollama", webAppEnvironment["ChatProvider"]);
-        Assert.IsTrue(webAppEnvironment.ContainsKey("ConnectionStrings__chat"));
+        Assert.AreEqual("{chat.connectionString}", webAppEnvironment["ConnectionStrings__chat"]);
 
         var catalogEnvironment = await EnvironmentOf(app, app.Catalog);
         Assert.IsFalse(catalogEnvironment.ContainsKey("OllamaEnabled"));
-        Assert.IsTrue(catalogEnvironment.ContainsKey("ConnectionStrings__textEmbeddingModel"));
+        Assert.AreEqual("{textEmbeddingModel.connectionString}", catalogEnvironment["ConnectionStrings__textEmbeddingModel"]);
     }
 
     [TestMethod]
