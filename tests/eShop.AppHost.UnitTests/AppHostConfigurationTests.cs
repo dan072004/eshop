@@ -94,6 +94,63 @@ public class AppHostConfigurationTests
     }
 
     [TestMethod]
+    [DataRow("Claude")]
+    [DataRow("claude")]
+    public async Task ClaudeChatProviderAddsOnlyTheKeySecretAndPassesItToWebApp(string configuredValue)
+    {
+        var app = CreateAppModel(chatProvider: configuredValue, embeddingProvider: null);
+
+        CollectionAssert.AreEquivalent(new[] { "anthropic-api-key" }, app.AddedResources);
+        var key = app.Builder.Resources.OfType<ParameterResource>().Single(p => p.Name == "anthropic-api-key");
+        Assert.IsTrue(key.Secret);
+
+        var webAppEnvironment = await EnvironmentOf(app, app.WebApp);
+        Assert.AreEqual("Claude", webAppEnvironment["ChatProvider"]);
+        Assert.AreEqual("{anthropic-api-key.value}", webAppEnvironment["ANTHROPIC_API_KEY"]);
+        Assert.IsFalse(HasConnectionString(webAppEnvironment));
+
+        var catalogEnvironment = await EnvironmentOf(app, app.Catalog);
+        Assert.IsFalse(catalogEnvironment.ContainsKey("OllamaEnabled"));
+        Assert.IsFalse(HasConnectionString(catalogEnvironment));
+    }
+
+    [TestMethod]
+    [DataRow("Foundry", "foundry", "textEmbeddingModel", null)]
+    [DataRow("Ollama", "ollama", "embedding", "true")]
+    public async Task ClaudeChatWithEmbeddingProviderAddsTheKeySecretAndOnlyTheEmbeddingModel(
+        string embeddingProvider, string providerResource, string embeddingResource, string? expectedOllamaEnabled)
+    {
+        var app = CreateAppModel(chatProvider: "Claude", embeddingProvider: embeddingProvider);
+
+        CollectionAssert.AreEquivalent(
+            new[] { "anthropic-api-key", providerResource, embeddingResource },
+            app.AddedResources);
+
+        var webAppEnvironment = await EnvironmentOf(app, app.WebApp);
+        Assert.AreEqual("Claude", webAppEnvironment["ChatProvider"]);
+        Assert.AreEqual("{anthropic-api-key.value}", webAppEnvironment["ANTHROPIC_API_KEY"]);
+        Assert.IsFalse(HasConnectionString(webAppEnvironment));
+
+        var catalogEnvironment = await EnvironmentOf(app, app.Catalog);
+        Assert.IsTrue(catalogEnvironment.ContainsKey($"ConnectionStrings__{embeddingResource}"));
+        Assert.AreEqual(expectedOllamaEnabled, catalogEnvironment.GetValueOrDefault("OllamaEnabled"));
+        Assert.IsFalse(catalogEnvironment.ContainsKey("ANTHROPIC_API_KEY"));
+    }
+
+    [TestMethod]
+    [DataRow(null, DisplayName = "missing")]
+    [DataRow("None")]
+    [DataRow("Ollama")]
+    [DataRow("Foundry")]
+    public async Task OnlyClaudeChatProviderDeclaresTheAnthropicKey(string? chatProvider)
+    {
+        var app = CreateAppModel(chatProvider: chatProvider, embeddingProvider: "Foundry");
+
+        Assert.IsFalse(app.Builder.Resources.Any(resource => resource.Name == "anthropic-api-key"));
+        Assert.IsFalse((await EnvironmentOf(app, app.WebApp)).ContainsKey("ANTHROPIC_API_KEY"));
+    }
+
+    [TestMethod]
     [DataRow("Ollama", "ollama", "embedding", "true")]
     [DataRow("ollama", "ollama", "embedding", "true")]
     [DataRow("Foundry", "foundry", "textEmbeddingModel", null)]
@@ -166,11 +223,11 @@ public class AppHostConfigurationTests
     }
 
     [TestMethod]
-    [DataRow("ChatProvider", "OpenAI")]
-    [DataRow("ChatProvider", "1")]
-    [DataRow("EmbeddingProvider", "Claude")]
-    [DataRow("EmbeddingProvider", "true")]
-    public void UnknownSelectorValueFailsNamingTheSettingAndAllowedValues(string setting, string value)
+    [DataRow("ChatProvider", "OpenAI", "None, Ollama, Foundry, Claude.")]
+    [DataRow("ChatProvider", "1", "None, Ollama, Foundry, Claude.")]
+    [DataRow("EmbeddingProvider", "Claude", "None, Ollama, Foundry.")]
+    [DataRow("EmbeddingProvider", "true", "None, Ollama, Foundry.")]
+    public void UnknownSelectorValueFailsNamingTheSettingAndAllowedValues(string setting, string value, string allowedValues)
     {
         var exception = Assert.ThrowsExactly<InvalidOperationException>(() => CreateAppModel(
             chatProvider: setting == "ChatProvider" ? value : null,
@@ -178,7 +235,7 @@ public class AppHostConfigurationTests
 
         Assert.Contains(setting, exception.Message);
         Assert.Contains($"'{value}'", exception.Message);
-        Assert.Contains("None, Ollama, Foundry", exception.Message);
+        Assert.EndsWith($"Allowed values: {allowedValues}", exception.Message);
     }
 
     private sealed record AppModel(

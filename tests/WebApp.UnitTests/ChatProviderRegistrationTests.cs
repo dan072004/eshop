@@ -59,6 +59,56 @@ public class ChatProviderRegistrationTests
     }
 
     [TestMethod]
+    [DataRow("Claude")]
+    [DataRow("claude")]
+    public void ClaudeChatProviderResolvesAnAnthropicChatClientWithFunctionInvocationOnHaiku(string chatProvider)
+    {
+        using var services = BuildServices(new()
+        {
+            ["ChatProvider"] = chatProvider,
+            ["ANTHROPIC_API_KEY"] = "not-a-real-key"
+        });
+
+        var client = services.GetRequiredService<IChatClient>();
+
+        Assert.IsNotNull(client.GetService<FunctionInvokingChatClient>());
+        var metadata = client.GetService<ChatClientMetadata>();
+        Assert.IsNotNull(metadata);
+        Assert.AreEqual("anthropic", metadata.ProviderName);
+        Assert.AreEqual("claude-haiku-4-5", metadata.DefaultModelId);
+    }
+
+    [TestMethod]
+    public void ClaudeChatProviderHonoursAnOverriddenModelId()
+    {
+        using var services = BuildServices(new()
+        {
+            ["ChatProvider"] = "Claude",
+            ["ANTHROPIC_API_KEY"] = "not-a-real-key",
+            ["Claude:ModelId"] = "claude-sonnet-4-5",
+            ["Claude:MaxOutputTokens"] = "2048"
+        });
+
+        var metadata = services.GetRequiredService<IChatClient>().GetService<ChatClientMetadata>();
+
+        Assert.IsNotNull(metadata);
+        Assert.AreEqual("claude-sonnet-4-5", metadata.DefaultModelId);
+    }
+
+    [TestMethod]
+    [DataRow(null, DisplayName = "missing")]
+    [DataRow("", DisplayName = "empty")]
+    [DataRow(" ", DisplayName = "whitespace")]
+    public void ClaudeChatProviderWithoutAnApiKeyFailsAtStartupNamingTheSetting(string? apiKey)
+    {
+        var builder = CreateBuilder(new() { ["ChatProvider"] = "Claude", ["ANTHROPIC_API_KEY"] = apiKey });
+
+        var exception = Assert.ThrowsExactly<InvalidOperationException>(builder.AddChatProvider);
+
+        Assert.Contains("ANTHROPIC_API_KEY", exception.Message);
+    }
+
+    [TestMethod]
     [DataRow("OpenAI")]
     [DataRow("1")]
     public void UnknownChatProviderFailsAtStartupNamingTheSetting(string chatProvider)
@@ -69,7 +119,7 @@ public class ChatProviderRegistrationTests
 
         Assert.Contains("ChatProvider", exception.Message);
         Assert.Contains($"'{chatProvider}'", exception.Message);
-        Assert.Contains("None, Ollama, Foundry", exception.Message);
+        Assert.EndsWith("Allowed values: None, Ollama, Foundry, Claude.", exception.Message);
     }
 
     private static ServiceProvider BuildServices(Dictionary<string, string?> configuration)

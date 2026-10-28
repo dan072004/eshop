@@ -1,4 +1,6 @@
-﻿using eShop.Basket.API.Grpc;
+﻿using Anthropic;
+using Anthropic.Core;
+using eShop.Basket.API.Grpc;
 using eShop.WebApp.Services.OrderStatus.IntegrationEvents;
 using eShop.WebAppComponents.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -93,14 +95,16 @@ public static class Extensions
 
     /// <summary>
     /// Registers the Shopping Assistant's <see cref="IChatClient"/> for the Chat Provider named by the
-    /// <c>ChatProvider</c> setting (<c>None</c>, <c>Ollama</c> or <c>Foundry</c>, case-insensitive).
+    /// <c>ChatProvider</c> setting (<c>None</c>, <c>Ollama</c>, <c>Foundry</c> or <c>Claude</c>, case-insensitive).
     /// Missing or <c>None</c> registers no client, which switches the Shopping Assistant off.
     /// </summary>
-    /// <exception cref="InvalidOperationException">The setting has an unknown value.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The setting has an unknown value, or it is <c>Claude</c> and <c>ANTHROPIC_API_KEY</c> is not set.
+    /// </exception>
     public static void AddChatProvider(this IHostApplicationBuilder builder)
     {
         const string Setting = "ChatProvider";
-        string[] allowed = ["None", "Ollama", "Foundry"];
+        string[] allowed = ["None", "Ollama", "Foundry", "Claude"];
 
         var value = builder.Configuration[Setting];
         var chatProvider = string.IsNullOrWhiteSpace(value)
@@ -113,10 +117,37 @@ public static class Extensions
         {
             "Ollama" => builder.AddOllamaApiClient("chat").AddChatClient(),
             "Foundry" => builder.AddOpenAIClientFromConfiguration("chatModel").AddChatClient(),
+            "Claude" => builder.AddClaudeChatClient(),
             _ => null
         };
 
         chatClientBuilder?.UseFunctionInvocation();
+    }
+
+    // There is no Aspire client integration for Anthropic, so the client is built from the official SDK.
+    private static ChatClientBuilder AddClaudeChatClient(this IHostApplicationBuilder builder)
+    {
+        const string KeySetting = "ANTHROPIC_API_KEY";
+
+        // The SDK would read the key itself, but only fail on the first request; checking here fails at startup instead.
+        var apiKey = builder.Configuration[KeySetting];
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            throw new InvalidOperationException(
+                $"ChatProvider is Claude, but the {KeySetting} setting is missing. Set the AppHost's anthropic-api-key parameter.");
+        }
+
+        // Defaults suit a quick shopping helper; override them under Claude:ModelId and Claude:MaxOutputTokens.
+        var claude = builder.Configuration.GetSection("Claude");
+        var modelId = claude["ModelId"] is { Length: > 0 } configuredModelId ? configuredModelId : "claude-haiku-4-5";
+        var maxOutputTokens = claude.GetValue("MaxOutputTokens", 1024);
+
+        var chatClient = new AnthropicClient(new ClientOptions { ApiKey = apiKey })
+            .AsIChatClient(modelId, maxOutputTokens);
+
+        // The adapter has no "off" thinking mode; ReasoningEffort.None is what makes it send thinking.type=disabled.
+        return builder.Services.AddChatClient(chatClient)
+            .ConfigureOptions(options => options.Reasoning ??= new ReasoningOptions { Effort = ReasoningEffort.None });
     }
 
     public static async Task<string?> GetBuyerIdAsync(this AuthenticationStateProvider authenticationStateProvider)
