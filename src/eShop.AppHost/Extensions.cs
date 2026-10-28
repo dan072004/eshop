@@ -72,7 +72,7 @@ internal static class Extensions
                 webApp.WithReference(chatDeployment).WaitFor(chatDeployment);
                 break;
             case ChatProvider.Ollama:
-                var chatModel = GetOrAddOllama().AddModel("chat", "llama3.1");
+                var chatModel = GetOrAddOllama().AddModel("chat", "qwen3:8b");
                 webApp.WithReference(chatModel).WaitFor(chatModel);
                 break;
             case ChatProvider.Claude:

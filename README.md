@@ -104,7 +104,7 @@ The two are independent, for example Foundry chat with Ollama embeddings, or Cla
 
 #### Ollama
 
-Ollama runs locally in a container, with the `llama3.1` chat model and the `all-minilm` embedding model:
+Ollama runs locally in a container, with the `qwen3:8b` chat model and the `all-minilm` embedding model:
 
 ```powershell
 $env:ChatProvider = "Ollama"
