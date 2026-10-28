@@ -106,7 +106,7 @@ public static class Extensions
     {
         var chatClientBuilder = GetChatProvider(builder.Configuration) switch
         {
-            ChatProvider.Ollama => builder.AddOllamaApiClient("chat").AddChatClient(),
+            ChatProvider.Ollama => builder.AddOllamaChatClient(),
             ChatProvider.Foundry => builder.AddOpenAIClientFromConfiguration("chatModel").AddChatClient(),
             ChatProvider.Claude => builder.AddClaudeChatClient(),
             _ => null
@@ -134,6 +134,27 @@ public static class Extensions
             ? Enum.Parse<ChatProvider>(name)
             : throw new InvalidOperationException(
                 $"The {Setting} setting has the unknown value '{value}'. Allowed values: {string.Join(", ", allowed)}.");
+    }
+
+    private static ChatClientBuilder AddOllamaChatClient(this IHostApplicationBuilder builder)
+    {
+        const string ConnectionName = "chat";
+
+        // Thinking models such as qwen3 reason before every reply, which makes a shopping helper slow.
+        var chatClientBuilder = builder.AddOllamaApiClient(ConnectionName).AddChatClient()
+            .ConfigureOptions(options => (options.AdditionalProperties ??= [])
+                .TryAdd(OllamaSharp.Models.OllamaOption.Think.Name, false));
+
+        // A local model can take minutes to load and answer, so the standard handler from ServiceDefaults
+        // (10s per attempt, 30s in total, retries) would cancel every reply; retrying a long generation only adds load.
+        // The integration names its HttpClient "<connection name>_httpClient". Registered after it, so this runs last.
+#pragma warning disable EXTEXP0001 // Experimental, but the supported way to drop the handler added by ConfigureHttpClientDefaults.
+        builder.Services.AddHttpClient($"{ConnectionName}_httpClient")
+            .RemoveAllResilienceHandlers()
+            .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromMinutes(5));
+#pragma warning restore EXTEXP0001
+
+        return chatClientBuilder;
     }
 
     // There is no Aspire client integration for Anthropic, so the client is built from the official SDK.

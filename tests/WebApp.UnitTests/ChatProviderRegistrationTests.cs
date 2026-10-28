@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.AI;
+﻿using eShop.ServiceDefaults;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -8,6 +9,8 @@ namespace eShop.WebApp.UnitTests;
 [TestClass]
 public class ChatProviderRegistrationTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     [DataRow(null, DisplayName = "missing")]
     [DataRow("", DisplayName = "empty")]
@@ -37,6 +40,29 @@ public class ChatProviderRegistrationTests
         var metadata = client.GetService<ChatClientMetadata>();
         Assert.IsNotNull(metadata);
         Assert.AreEqual("llama3.1", metadata.DefaultModelId);
+    }
+
+    [TestMethod]
+    public async Task OllamaChatClientSendsEachRequestOnceWithThinkingOff()
+    {
+        // A failing Ollama: the service-wide standard resilience handler would retry this, so one call proves it was removed.
+        var ollama = new FailingOllamaHandler();
+        var builder = CreateBuilder(new()
+        {
+            ["ChatProvider"] = "Ollama",
+            ["ConnectionStrings:chat"] = "Endpoint=http://localhost:11434;Model=qwen3:8b"
+        });
+        builder.AddServiceDefaults();
+        builder.AddChatProvider();
+        builder.Services.AddHttpClient("chat_httpClient").ConfigurePrimaryHttpMessageHandler(() => ollama);
+        using var services = builder.Services.BuildServiceProvider();
+
+        var client = services.GetRequiredService<IChatClient>();
+
+        await Assert.ThrowsAsync<Exception>(() => client.GetResponseAsync("Do you sell tents?", cancellationToken: TestContext.CancellationToken));
+        Assert.HasCount(1, ollama.RequestBodies);
+        Assert.Contains("\"think\":false", ollama.RequestBodies[0]);
+        Assert.AreEqual(TimeSpan.FromMinutes(5), services.GetRequiredService<IHttpClientFactory>().CreateClient("chat_httpClient").Timeout);
     }
 
     [TestMethod]
@@ -152,5 +178,16 @@ public class ChatProviderRegistrationTests
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
         builder.Configuration.AddInMemoryCollection(configuration);
         return builder;
+    }
+
+    private sealed class FailingOllamaHandler : HttpMessageHandler
+    {
+        public List<string> RequestBodies { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestBodies.Add(await request.Content!.ReadAsStringAsync(cancellationToken));
+            return new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError);
+        }
     }
 }
