@@ -1,4 +1,5 @@
-﻿using Aspire.Hosting;
+﻿using System.Runtime.CompilerServices;
+using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Dotnet;
 using Aspire.Hosting.Eventing;
@@ -50,46 +51,239 @@ public class AppHostConfigurationTests
     }
 
     [TestMethod]
-    [DataRow(null, false)]
-    [DataRow("", false)]
-    [DataRow("invalid", false)]
-    [DataRow("false", false)]
-    [DataRow("true", true)]
-    public void FoundryFlagUsesSafeOptInDefault(string? configuredValue, bool expected)
+    [DataRow(null, DisplayName = "missing")]
+    [DataRow("", DisplayName = "empty")]
+    [DataRow("None")]
+    [DataRow("none")]
+    public async Task NoChatOrEmbeddingProviderAddsNoAIResources(string? configuredValue)
     {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["UseFoundry"] = configuredValue })
-            .Build();
+        var app = CreateAppModel(chatProvider: configuredValue, embeddingProvider: configuredValue);
 
-        Assert.AreEqual(expected, Extensions.IsFoundryEnabled(configuration));
+        Assert.IsEmpty(app.AddedResources);
+
+        var webAppEnvironment = await EnvironmentOf(app, app.WebApp);
+        Assert.AreEqual("None", webAppEnvironment["ChatProvider"]);
+        Assert.IsFalse(HasConnectionString(webAppEnvironment));
+
+        var catalogEnvironment = await EnvironmentOf(app, app.Catalog);
+        Assert.IsFalse(catalogEnvironment.ContainsKey("OllamaEnabled"));
+        Assert.IsFalse(HasConnectionString(catalogEnvironment));
     }
 
     [TestMethod]
-    public void FoundryExtensionAddsExpectedDeployments()
+    [DataRow("Ollama", "Ollama", "ollama", "chat")]
+    [DataRow("OLLAMA", "Ollama", "ollama", "chat")]
+    [DataRow("Foundry", "Foundry", "foundry", "chatModel")]
+    [DataRow("foundry", "Foundry", "foundry", "chatModel")]
+    public async Task ChatProviderAddsOnlyItsChatModelAndTellsWebApp(
+        string configuredValue, string expectedChatProvider, string providerResource, string chatResource)
     {
-        var builder = CreateBuilder();
-        var catalog = builder.AddDotnetProject("catalog-api", ProjectPath("Catalog.API", "Catalog.API.csproj"));
-        var webApp = builder.AddDotnetProject("webapp", ProjectPath("WebApp", "WebApp.csproj"));
+        var app = CreateAppModel(chatProvider: configuredValue, embeddingProvider: null);
 
-        builder.AddFoundry(catalog, webApp);
+        CollectionAssert.AreEquivalent(
+            new[] { providerResource, chatResource },
+            app.AddedResources);
 
-        CollectionAssert.IsSubsetOf(
-            new[] { "foundry", "chatModel", "textEmbeddingModel" },
-            builder.Resources.Select(resource => resource.Name).ToArray());
+        var webAppEnvironment = await EnvironmentOf(app, app.WebApp);
+        Assert.AreEqual(expectedChatProvider, webAppEnvironment["ChatProvider"]);
+        Assert.AreEqual($"{{{chatResource}.connectionString}}", webAppEnvironment[$"ConnectionStrings__{chatResource}"]);
+
+        var catalogEnvironment = await EnvironmentOf(app, app.Catalog);
+        Assert.IsFalse(catalogEnvironment.ContainsKey("OllamaEnabled"));
+        Assert.IsFalse(HasConnectionString(catalogEnvironment));
     }
 
     [TestMethod]
-    public void OllamaExtensionAddsExpectedModels()
+    [DataRow("Claude")]
+    [DataRow("claude")]
+    public async Task ClaudeChatProviderAddsOnlyTheKeySecretAndPassesItToWebApp(string configuredValue)
+    {
+        var app = CreateAppModel(chatProvider: configuredValue, embeddingProvider: null);
+
+        CollectionAssert.AreEquivalent(new[] { "anthropic-api-key" }, app.AddedResources);
+        var key = app.Builder.Resources.OfType<ParameterResource>().Single(p => p.Name == "anthropic-api-key");
+        Assert.IsTrue(key.Secret);
+
+        var webAppEnvironment = await EnvironmentOf(app, app.WebApp);
+        Assert.AreEqual("Claude", webAppEnvironment["ChatProvider"]);
+        Assert.AreEqual("{anthropic-api-key.value}", webAppEnvironment["ANTHROPIC_API_KEY"]);
+        Assert.IsFalse(HasConnectionString(webAppEnvironment));
+
+        var catalogEnvironment = await EnvironmentOf(app, app.Catalog);
+        Assert.IsFalse(catalogEnvironment.ContainsKey("OllamaEnabled"));
+        Assert.IsFalse(HasConnectionString(catalogEnvironment));
+    }
+
+    [TestMethod]
+    [DataRow("Foundry", "foundry", "textEmbeddingModel", null)]
+    [DataRow("Ollama", "ollama", "embedding", "true")]
+    public async Task ClaudeChatWithEmbeddingProviderAddsTheKeySecretAndOnlyTheEmbeddingModel(
+        string embeddingProvider, string providerResource, string embeddingResource, string? expectedOllamaEnabled)
+    {
+        var app = CreateAppModel(chatProvider: "Claude", embeddingProvider: embeddingProvider);
+
+        CollectionAssert.AreEquivalent(
+            new[] { "anthropic-api-key", providerResource, embeddingResource },
+            app.AddedResources);
+
+        var webAppEnvironment = await EnvironmentOf(app, app.WebApp);
+        Assert.AreEqual("Claude", webAppEnvironment["ChatProvider"]);
+        Assert.AreEqual("{anthropic-api-key.value}", webAppEnvironment["ANTHROPIC_API_KEY"]);
+        Assert.IsFalse(HasConnectionString(webAppEnvironment));
+
+        var catalogEnvironment = await EnvironmentOf(app, app.Catalog);
+        Assert.AreEqual($"{{{embeddingResource}.connectionString}}", catalogEnvironment[$"ConnectionStrings__{embeddingResource}"]);
+        Assert.AreEqual(expectedOllamaEnabled, catalogEnvironment.GetValueOrDefault("OllamaEnabled"));
+        Assert.IsFalse(catalogEnvironment.ContainsKey("ANTHROPIC_API_KEY"));
+    }
+
+    [TestMethod]
+    [DataRow(null, DisplayName = "missing")]
+    [DataRow("None")]
+    [DataRow("Ollama")]
+    [DataRow("Foundry")]
+    public async Task OnlyClaudeChatProviderDeclaresTheAnthropicKey(string? chatProvider)
+    {
+        var app = CreateAppModel(chatProvider: chatProvider, embeddingProvider: "Foundry");
+
+        Assert.IsFalse(app.Builder.Resources.Any(resource => resource.Name == "anthropic-api-key"));
+        Assert.IsFalse((await EnvironmentOf(app, app.WebApp)).ContainsKey("ANTHROPIC_API_KEY"));
+    }
+
+    [TestMethod]
+    [DataRow("Ollama", "ollama", "embedding", "true")]
+    [DataRow("ollama", "ollama", "embedding", "true")]
+    [DataRow("Foundry", "foundry", "textEmbeddingModel", null)]
+    [DataRow("FOUNDRY", "foundry", "textEmbeddingModel", null)]
+    public async Task EmbeddingProviderAddsOnlyItsEmbeddingModelAndGivesItToCatalog(
+        string configuredValue, string providerResource, string embeddingResource, string? expectedOllamaEnabled)
+    {
+        var app = CreateAppModel(chatProvider: null, embeddingProvider: configuredValue);
+
+        CollectionAssert.AreEquivalent(
+            new[] { providerResource, embeddingResource },
+            app.AddedResources);
+
+        var catalogEnvironment = await EnvironmentOf(app, app.Catalog);
+        Assert.AreEqual($"{{{embeddingResource}.connectionString}}", catalogEnvironment[$"ConnectionStrings__{embeddingResource}"]);
+        Assert.AreEqual(expectedOllamaEnabled, catalogEnvironment.GetValueOrDefault("OllamaEnabled"));
+
+        var webAppEnvironment = await EnvironmentOf(app, app.WebApp);
+        Assert.AreEqual("None", webAppEnvironment["ChatProvider"]);
+        Assert.IsFalse(HasConnectionString(webAppEnvironment));
+    }
+
+    [TestMethod]
+    public async Task FoundryChatWithOllamaEmbeddingsUsesEachProviderForItsOwnPart()
+    {
+        var app = CreateAppModel(chatProvider: "Foundry", embeddingProvider: "Ollama");
+
+        CollectionAssert.AreEquivalent(
+            new[] { "foundry", "chatModel", "ollama", "embedding" },
+            app.AddedResources);
+
+        var webAppEnvironment = await EnvironmentOf(app, app.WebApp);
+        Assert.AreEqual("Foundry", webAppEnvironment["ChatProvider"]);
+        Assert.AreEqual("{chatModel.connectionString}", webAppEnvironment["ConnectionStrings__chatModel"]);
+
+        var catalogEnvironment = await EnvironmentOf(app, app.Catalog);
+        Assert.AreEqual("true", catalogEnvironment["OllamaEnabled"]);
+        Assert.AreEqual("{embedding.connectionString}", catalogEnvironment["ConnectionStrings__embedding"]);
+    }
+
+    [TestMethod]
+    public async Task OllamaChatWithFoundryEmbeddingsUsesEachProviderForItsOwnPart()
+    {
+        var app = CreateAppModel(chatProvider: "Ollama", embeddingProvider: "Foundry");
+
+        CollectionAssert.AreEquivalent(
+            new[] { "ollama", "chat", "foundry", "textEmbeddingModel" },
+            app.AddedResources);
+
+        var webAppEnvironment = await EnvironmentOf(app, app.WebApp);
+        Assert.AreEqual("Ollama", webAppEnvironment["ChatProvider"]);
+        Assert.AreEqual("{chat.connectionString}", webAppEnvironment["ConnectionStrings__chat"]);
+
+        var catalogEnvironment = await EnvironmentOf(app, app.Catalog);
+        Assert.IsFalse(catalogEnvironment.ContainsKey("OllamaEnabled"));
+        Assert.AreEqual("{textEmbeddingModel.connectionString}", catalogEnvironment["ConnectionStrings__textEmbeddingModel"]);
+    }
+
+    [TestMethod]
+    [DataRow("Foundry", "foundry", "chatModel", "textEmbeddingModel")]
+    [DataRow("Ollama", "ollama", "chat", "embedding")]
+    public void ProviderUsedForChatAndEmbeddingsIsCreatedOnce(
+        string provider, string providerResource, string chatResource, string embeddingResource)
+    {
+        var app = CreateAppModel(chatProvider: provider, embeddingProvider: provider);
+
+        CollectionAssert.AreEquivalent(
+            new[] { providerResource, chatResource, embeddingResource },
+            app.AddedResources);
+    }
+
+    [TestMethod]
+    [DataRow("ChatProvider", "OpenAI", "None, Ollama, Foundry, Claude.")]
+    [DataRow("ChatProvider", "1", "None, Ollama, Foundry, Claude.")]
+    [DataRow("EmbeddingProvider", "Claude", "None, Ollama, Foundry.")]
+    [DataRow("EmbeddingProvider", "true", "None, Ollama, Foundry.")]
+    public void UnknownSelectorValueFailsNamingTheSettingAndAllowedValues(string setting, string value, string allowedValues)
+    {
+        var exception = Assert.ThrowsExactly<InvalidOperationException>(() => CreateAppModel(
+            chatProvider: setting == "ChatProvider" ? value : null,
+            embeddingProvider: setting == "EmbeddingProvider" ? value : null));
+
+        Assert.Contains(setting, exception.Message);
+        Assert.Contains($"'{value}'", exception.Message);
+        Assert.EndsWith($"Allowed values: {allowedValues}", exception.Message);
+    }
+
+    private sealed record AppModel(
+        IDistributedApplicationBuilder Builder,
+        string[] AddedResources,
+        IResourceBuilder<DotnetProjectResource> Catalog,
+        IResourceBuilder<DotnetProjectResource> WebApp);
+
+    private static AppModel CreateAppModel(string? chatProvider, string? embeddingProvider)
     {
         var builder = CreateBuilder();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ChatProvider"] = chatProvider,
+            ["EmbeddingProvider"] = embeddingProvider
+        });
         var catalog = builder.AddDotnetProject("catalog-api", ProjectPath("Catalog.API", "Catalog.API.csproj"));
         var webApp = builder.AddDotnetProject("webapp", ProjectPath("WebApp", "WebApp.csproj"));
 
-        builder.AddOllama(catalog, webApp);
+        var resourcesBefore = ResourceNames(builder);
 
-        CollectionAssert.IsSubsetOf(
-            new[] { "ollama", "embedding", "chat" },
-            builder.Resources.Select(resource => resource.Name).ToArray());
+        builder.AddChatAndEmbeddingProviders(catalog, webApp);
+
+        // The Azure environment and Open WebUI come with the Foundry and Ollama integrations; we assert on the resources we choose.
+        var added = ResourceNames(builder).Except(resourcesBefore).Except(["azure-environment", "ollama-openwebui"]).ToArray();
+        return new AppModel(builder, added, catalog, webApp);
+    }
+
+    private static string[] ResourceNames(IDistributedApplicationBuilder builder) =>
+        builder.Resources.Select(resource => resource.Name).ToArray();
+
+    private static bool HasConnectionString(Dictionary<string, string> environment) =>
+        environment.Keys.Any(key => key.StartsWith("ConnectionStrings__", StringComparison.Ordinal));
+
+    // Publish mode renders references as manifest expressions, so nothing has to be provisioned or started.
+    private async Task<Dictionary<string, string>> EnvironmentOf(AppModel app, IResourceBuilder<DotnetProjectResource> project)
+    {
+        using var services = app.Builder.Services.BuildServiceProvider();
+        var executionContext = new DistributedApplicationExecutionContext(
+            new DistributedApplicationExecutionContextOptions(DistributedApplicationOperation.Publish) { Services = services });
+
+        var configuration = await ExecutionConfigurationBuilder.Create(project.Resource)
+            .WithEnvironmentVariablesConfig()
+            .BuildAsync(executionContext,
+                cancellationToken: TestContext.CancellationToken);
+
+        Assert.IsNull(configuration.Exception);
+        return configuration.EnvironmentVariables.ToDictionary();
     }
 
     private static IDistributedApplicationBuilder CreateBuilder() =>
@@ -102,15 +296,20 @@ public class AppHostConfigurationTests
     private static string ProjectPath(string directory, string project) =>
         Path.Combine(FindRepositoryRoot(), "src", directory, project);
 
-    private static string FindRepositoryRoot()
+    // Walks up from the output folder, then from this source file (for builds with an --artifacts-path outside the repo).
+    private static string FindRepositoryRoot([CallerFilePath] string sourceFile = "") =>
+        FindAncestorWithSolution(AppContext.BaseDirectory)
+            ?? FindAncestorWithSolution(Path.GetDirectoryName(sourceFile)!)
+            ?? throw new DirectoryNotFoundException("Could not locate the eShop repository root.");
+
+    private static string? FindAncestorWithSolution(string start)
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        var directory = new DirectoryInfo(start);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "eShop.slnx")))
         {
             directory = directory.Parent;
         }
 
-        return directory?.FullName
-            ?? throw new DirectoryNotFoundException("Could not locate the eShop repository root.");
+        return directory?.FullName;
     }
 }

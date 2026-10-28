@@ -11,9 +11,6 @@ namespace eShop.AppHost;
 
 internal static class Extensions
 {
-    public static bool IsFoundryEnabled(IConfiguration configuration) =>
-        bool.TryParse(configuration["UseFoundry"], out var useFoundry) && useFoundry;
-
     /// <summary>
     /// Adds a hook to set the ASPNETCORE_FORWARDEDHEADERS_ENABLED environment variable to true for all projects in the application.
     /// </summary>
@@ -45,44 +42,84 @@ internal static class Extensions
     }
 
     /// <summary>
-    /// Configures eShop projects to use Microsoft Foundry for text embedding and chat.
+    /// Provisions the AI services chosen by the <c>ChatProvider</c> and <c>EmbeddingProvider</c> settings
+    /// (each <c>None</c>, <c>Ollama</c> or <c>Foundry</c>, plus <c>Claude</c> for chat only; case-insensitive; default <c>None</c>).
+    /// WebApp is told the chosen Chat Provider and gets its chat model, or for Claude the <c>anthropic-api-key</c> secret
+    /// as <c>ANTHROPIC_API_KEY</c>; Catalog.API gets the embedding model.
+    /// A provider chosen for both is created once.
     /// </summary>
-    public static IDistributedApplicationBuilder AddFoundry(this IDistributedApplicationBuilder builder,
+    public static IDistributedApplicationBuilder AddChatAndEmbeddingProviders(this IDistributedApplicationBuilder builder,
         IResourceBuilder<DotnetProjectResource> catalogApi,
         IResourceBuilder<DotnetProjectResource> webApp)
     {
-        var foundry = builder.AddFoundry("foundry");
-        var chat = foundry.AddDeployment("chatModel", "gpt-4.1-mini", "2025-04-14", "OpenAI");
-        var textEmbedding = foundry.AddDeployment("textEmbeddingModel", "text-embedding-3-small", "1", "OpenAI");
+        var chatProvider = ParseSelector<ChatProvider>(builder.Configuration, "ChatProvider");
+        var embeddingProvider = ParseSelector<EmbeddingProvider>(builder.Configuration, "EmbeddingProvider");
 
-        catalogApi.WithReference(textEmbedding).WaitFor(textEmbedding);
-        webApp.WithReference(chat).WaitFor(chat);
+        IResourceBuilder<FoundryResource>? foundry = null;
+        IResourceBuilder<FoundryResource> GetOrAddFoundry() => foundry ??= builder.AddFoundry("foundry");
+
+        IResourceBuilder<OllamaResource>? ollama = null;
+        IResourceBuilder<OllamaResource> GetOrAddOllama() => ollama ??= builder.AddOllama("ollama")
+            .WithDataVolume()
+            .WithGPUSupport()
+            .WithOpenWebUI();
+
+        webApp.WithEnvironment("ChatProvider", chatProvider.ToString());
+        switch (chatProvider)
+        {
+            case ChatProvider.Foundry:
+                var chatDeployment = GetOrAddFoundry().AddDeployment("chatModel", "gpt-4.1-mini", "2025-04-14", "OpenAI");
+                webApp.WithReference(chatDeployment).WaitFor(chatDeployment);
+                break;
+            case ChatProvider.Ollama:
+                var chatModel = GetOrAddOllama().AddModel("chat", "llama3.1");
+                webApp.WithReference(chatModel).WaitFor(chatModel);
+                break;
+            case ChatProvider.Claude:
+                // There is no Aspire integration for Anthropic, so the key is a secret parameter (the dashboard
+                // prompts for a missing one), passed as the variable the Anthropic SDK reads.
+                var anthropicApiKey = builder.AddParameter("anthropic-api-key", secret: true);
+                webApp.WithEnvironment("ANTHROPIC_API_KEY", anthropicApiKey);
+                break;
+        }
+
+        // Catalog.API works out its embedding source from what it is given: OllamaEnabled, or a textEmbeddingModel connection string.
+        switch (embeddingProvider)
+        {
+            case EmbeddingProvider.Foundry:
+                var embeddingDeployment = GetOrAddFoundry().AddDeployment("textEmbeddingModel", "text-embedding-3-small", "1", "OpenAI");
+                catalogApi.WithReference(embeddingDeployment).WaitFor(embeddingDeployment);
+                break;
+            case EmbeddingProvider.Ollama:
+                var embeddingModel = GetOrAddOllama().AddModel("embedding", "all-minilm");
+                catalogApi.WithReference(embeddingModel)
+                    .WithEnvironment("OllamaEnabled", "true")
+                    .WaitFor(embeddingModel);
+                break;
+        }
 
         return builder;
     }
 
-    /// <summary>
-    /// Configures eShop projects to use Ollama for text embedding and chat.
-    /// </summary>
-    public static IDistributedApplicationBuilder AddOllama(this IDistributedApplicationBuilder builder,
-        IResourceBuilder<DotnetProjectResource> catalogApi,
-        IResourceBuilder<DotnetProjectResource> webApp)
+    private enum ChatProvider { None, Ollama, Foundry, Claude }
+
+    private enum EmbeddingProvider { None, Ollama, Foundry }
+
+    // Matches names only (case-insensitively), so a numeric string such as "1" is rejected rather than cast.
+    private static TEnum ParseSelector<TEnum>(IConfiguration configuration, string setting) where TEnum : struct, Enum
     {
-        var ollama = builder.AddOllama("ollama")
-            .WithDataVolume()
-            .WithGPUSupport()
-            .WithOpenWebUI();
-        var embeddings = ollama.AddModel("embedding", "all-minilm");
-        var chat = ollama.AddModel("chat", "llama3.1");
+        var value = configuration[setting];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return default;
+        }
 
-        catalogApi.WithReference(embeddings)
-            .WithEnvironment("OllamaEnabled", "true")
-            .WaitFor(embeddings);
-        webApp.WithReference(chat)
-            .WithEnvironment("OllamaEnabled", "true")
-            .WaitFor(chat);
-
-        return builder;
+        var allowed = Enum.GetNames<TEnum>();
+        var name = allowed.FirstOrDefault(n => string.Equals(n, value.Trim(), StringComparison.OrdinalIgnoreCase));
+        return name is not null
+            ? Enum.Parse<TEnum>(name)
+            : throw new InvalidOperationException(
+                $"The {setting} setting has the unknown value '{value}'. Allowed values: {string.Join(", ", allowed)}.");
     }
 
     public static IResourceBuilder<YarpResource> ConfigureMobileBffRoutes(this IResourceBuilder<YarpResource> builder,

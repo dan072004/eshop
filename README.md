@@ -91,7 +91,28 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-### Optional: AI Chatbot with Microsoft Foundry
+### Optional: Shopping Assistant and semantic search
+
+Two AppHost settings choose the AI services. Both default to `None`, so a fresh clone needs no AI credentials or model downloads. Values are case-insensitive, and an unknown value stops the AppHost at startup.
+
+| Setting | Values | What it switches on |
+| --- | --- | --- |
+| `ChatProvider` | `None`, `Ollama`, `Foundry`, `Claude` | The Shopping Assistant in WebApp |
+| `EmbeddingProvider` | `None`, `Ollama`, `Foundry` | Semantic search in Catalog.API |
+
+The two are independent, for example Foundry chat with Ollama embeddings, or Claude chat with no semantic search. A provider chosen for both is created once. Claude is chat only, because Anthropic offers no embedding model.
+
+#### Ollama
+
+Ollama runs locally in a container, with the `llama3.1` chat model and the `all-minilm` embedding model:
+
+```powershell
+$env:ChatProvider = "Ollama"
+$env:EmbeddingProvider = "Ollama"
+aspire run
+```
+
+#### Microsoft Foundry
 
 This option provisions a Microsoft Foundry resource during local development, so first authenticate to Azure and configure the subscription and location:
 
@@ -101,14 +122,32 @@ aspire secret set "Azure:SubscriptionId" "<subscription-id>"
 aspire secret set "Azure:Location" "eastus"
 ```
 
-Then enable Foundry and start eShop:
+Then choose Foundry and start eShop:
 
 ```powershell
-$env:UseFoundry = "true"
+$env:ChatProvider = "Foundry"
+$env:EmbeddingProvider = "Foundry"
 aspire run
 ```
 
-Aspire provisions the `gpt-4.1-mini` and `text-embedding-3-small` deployments and injects their connection information into the consuming projects. The Foundry hosting integration currently uses a preview package. See [local Azure provisioning](https://aspire.dev/integrations/cloud/azure/local-provisioning/) and the [Microsoft Foundry hosting integration](https://aspire.dev/integrations/cloud/azure/azure-ai-foundry/azure-ai-foundry-host/) for details.
+Aspire provisions the `gpt-4.1-mini` deployment for chat and the `text-embedding-3-small` deployment for embeddings (only the ones you chose) and injects their connection information into the consuming projects. The Foundry hosting integration currently uses a preview package. See [local Azure provisioning](https://aspire.dev/integrations/cloud/azure/local-provisioning/) and the [Microsoft Foundry hosting integration](https://aspire.dev/integrations/cloud/azure/azure-ai-foundry/azure-ai-foundry-host/) for details.
+
+#### Claude
+
+Claude runs on the Anthropic API, so you need an [Anthropic API key](https://console.anthropic.com/settings/keys). The AppHost asks for it as the `anthropic-api-key` secret parameter and passes it to WebApp as `ANTHROPIC_API_KEY`. Store it once as a secret:
+
+```powershell
+aspire secret set "Parameters:anthropic-api-key" "<your-anthropic-api-key>"
+```
+
+If you skip this step, the Aspire dashboard prompts for the key when the app starts. Then choose Claude and start eShop:
+
+```powershell
+$env:ChatProvider = "Claude"
+aspire run
+```
+
+The Shopping Assistant uses `claude-haiku-4-5` with replies of up to 1024 tokens and thinking turned off. To change the model or the reply length, set `Claude:ModelId` or `Claude:MaxOutputTokens` in WebApp's configuration (for example `Claude__ModelId` as an environment variable or in WebApp's user secrets).
 
 ### Deploy to Azure Container Apps
 
