@@ -28,7 +28,7 @@ var identityApi = builder.AddDotnetProject("identity-api", "../Identity.API", o 
     .WithHttpHealthCheck("/health");
 
 var identityEndpoint = identityApi.GetEndpoint(launchProfileName);
-    
+
 var basketApi = builder.AddDotnetProject("basket-api", "../Basket.API")
     .WithReference(redis)
     .WithReference(rabbitMq).WaitFor(rabbitMq)
@@ -49,7 +49,7 @@ builder.AddDotnetProject("order-processor", "../OrderProcessor")
     .WithReference(rabbitMq).WaitFor(rabbitMq)
     .WithReference(orderDb)
     .WaitFor(orderingApi); // wait for the orderingApi to be ready because that contains the EF migrations
-    
+
 builder.AddDotnetProject("payment-processor", "../PaymentProcessor")
     .WithReference(rabbitMq).WaitFor(rabbitMq);
 
@@ -78,18 +78,9 @@ var webApp = builder.AddDotnetProject("webapp", "../WebApp", o => o.LaunchProfil
     .WaitFor(identityApi)
     .WithEnvironment("IdentityUrl", identityEndpoint);
 
-// Set UseFoundry=true to provision Microsoft Foundry for chat and embeddings.
-bool useFoundry = Extensions.IsFoundryEnabled(builder.Configuration);
-if (useFoundry)
-{
-    builder.AddFoundry(catalogApi, webApp);
-}
-
-bool useOllama = false;
-if (useOllama)
-{
-    builder.AddOllama(catalogApi, webApp);
-}
+// Set ChatProvider and EmbeddingProvider (None, Ollama or Foundry; default None) to switch on
+// the Shopping Assistant and semantic catalog search.
+builder.AddChatAndEmbeddingProviders(catalogApi, webApp);
 
 // Wire up the callback urls (self referencing)
 webApp.WithEnvironment("CallBackUrl", webApp.GetEndpoint(launchProfileName));

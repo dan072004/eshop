@@ -56,7 +56,8 @@ WebApp also subscribes to the status-change events so it can push live updates (
 
 **Front ends**
 - `WebApp`: Blazor Web App using static SSR with enhanced navigation and forms (`@formname`, `[SupplyParameterFromForm]`, `data-enhance`). Shared UI lives in `WebAppComponents`. Styling uses design tokens (CSS custom properties such as `--color-danger`, `--text-sm`, `--radius-md`) and per-component `.razor.css` files.
-- Catalog.API supports API versioning (v1/v2) and optional AI semantic search with embeddings: set `UseFoundry=true` to provision Microsoft Foundry. The generated OpenAPI documents (`Catalog.API*.json`) are checked in.
+- AI is opt-in through two AppHost settings, each `None` (default), `Ollama` or `Foundry`: `ChatProvider` picks the Chat Provider behind WebApp's Shopping Assistant (the AppHost passes the value to WebApp, whose `AddChatProvider` switches on it), and `EmbeddingProvider` picks the embeddings for Catalog.API's semantic search. A provider chosen for both is provisioned once (`AddChatAndEmbeddingProviders` in `src/eShop.AppHost/Extensions.cs`).
+- Catalog.API supports API versioning (v1/v2). The generated OpenAPI documents (`Catalog.API*.json`) are checked in.
 - `ClientApp` (MAUI) and `HybridApp` are outside `eShop.Web.slnf` and have their own CI workflow.
 
 ## Testing

@@ -25,7 +25,7 @@ public static class Extensions
         builder.Services.AddSingleton<BasketService>();
         builder.Services.AddSingleton<OrderStatusNotificationService>();
         builder.Services.AddSingleton<IProductImageUrlProvider, ProductImageUrlProvider>();
-        builder.AddAIServices();
+        builder.AddChatProvider();
 
         // HTTP and GRPC client registrations
         builder.Services.AddGrpcClient<Basket.BasketClient>(o => o.Address = new("http://basket-api"))
@@ -91,19 +91,30 @@ public static class Extensions
         services.AddCascadingAuthenticationState();
     }
 
-    private static void AddAIServices(this IHostApplicationBuilder builder)
+    /// <summary>
+    /// Registers the Shopping Assistant's <see cref="IChatClient"/> for the Chat Provider named by the
+    /// <c>ChatProvider</c> setting (<c>None</c>, <c>Ollama</c> or <c>Foundry</c>, case-insensitive).
+    /// Missing or <c>None</c> registers no client, which switches the Shopping Assistant off.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The setting has an unknown value.</exception>
+    public static void AddChatProvider(this IHostApplicationBuilder builder)
     {
-        ChatClientBuilder? chatClientBuilder = null;
-        if (builder.Configuration["OllamaEnabled"] is string ollamaEnabled && bool.Parse(ollamaEnabled))
+        const string Setting = "ChatProvider";
+        string[] allowed = ["None", "Ollama", "Foundry"];
+
+        var value = builder.Configuration[Setting];
+        var chatProvider = string.IsNullOrWhiteSpace(value)
+            ? "None"
+            : allowed.FirstOrDefault(name => string.Equals(name, value.Trim(), StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException(
+                    $"The {Setting} setting has the unknown value '{value}'. Allowed values: {string.Join(", ", allowed)}.");
+
+        var chatClientBuilder = chatProvider switch
         {
-            chatClientBuilder = builder.AddOllamaApiClient("chat")
-                .AddChatClient();
-        }
-        else if (!string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("chatModel")))
-        {
-            chatClientBuilder = builder.AddOpenAIClientFromConfiguration("chatModel")
-                .AddChatClient();
-        }
+            "Ollama" => builder.AddOllamaApiClient("chat").AddChatClient(),
+            "Foundry" => builder.AddOpenAIClientFromConfiguration("chatModel").AddChatClient(),
+            _ => null
+        };
 
         chatClientBuilder?.UseFunctionInvocation();
     }

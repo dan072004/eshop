@@ -91,7 +91,28 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-### Optional: AI Chatbot with Microsoft Foundry
+### Optional: Shopping Assistant and semantic search
+
+Two AppHost settings choose the AI services. Both default to `None`, so a fresh clone needs no AI credentials or model downloads. Values are case-insensitive, and an unknown value stops the AppHost at startup.
+
+| Setting | Values | What it switches on |
+| --- | --- | --- |
+| `ChatProvider` | `None`, `Ollama`, `Foundry` | The Shopping Assistant in WebApp |
+| `EmbeddingProvider` | `None`, `Ollama`, `Foundry` | Semantic search in Catalog.API |
+
+The two are independent, for example Foundry chat with Ollama embeddings. A provider chosen for both is created once.
+
+#### Ollama
+
+Ollama runs locally in a container, with the `llama3.1` chat model and the `all-minilm` embedding model:
+
+```powershell
+$env:ChatProvider = "Ollama"
+$env:EmbeddingProvider = "Ollama"
+aspire run
+```
+
+#### Microsoft Foundry
 
 This option provisions a Microsoft Foundry resource during local development, so first authenticate to Azure and configure the subscription and location:
 
@@ -101,14 +122,15 @@ aspire secret set "Azure:SubscriptionId" "<subscription-id>"
 aspire secret set "Azure:Location" "eastus"
 ```
 
-Then enable Foundry and start eShop:
+Then choose Foundry and start eShop:
 
 ```powershell
-$env:UseFoundry = "true"
+$env:ChatProvider = "Foundry"
+$env:EmbeddingProvider = "Foundry"
 aspire run
 ```
 
-Aspire provisions the `gpt-4.1-mini` and `text-embedding-3-small` deployments and injects their connection information into the consuming projects. The Foundry hosting integration currently uses a preview package. See [local Azure provisioning](https://aspire.dev/integrations/cloud/azure/local-provisioning/) and the [Microsoft Foundry hosting integration](https://aspire.dev/integrations/cloud/azure/azure-ai-foundry/azure-ai-foundry-host/) for details.
+Aspire provisions the `gpt-4.1-mini` deployment for chat and the `text-embedding-3-small` deployment for embeddings (only the ones you chose) and injects their connection information into the consuming projects. The Foundry hosting integration currently uses a preview package. See [local Azure provisioning](https://aspire.dev/integrations/cloud/azure/local-provisioning/) and the [Microsoft Foundry hosting integration](https://aspire.dev/integrations/cloud/azure/azure-ai-foundry/azure-ai-foundry-host/) for details.
 
 ### Deploy to Azure Container Apps
 
