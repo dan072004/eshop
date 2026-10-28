@@ -1,6 +1,6 @@
 # Spec: Claude as a Chat Provider
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 
