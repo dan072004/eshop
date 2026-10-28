@@ -6,6 +6,7 @@ To add an entry, put a row at the top of the table, and add a section below if t
 
 | Date | What went wrong | Caught by | Fix |
 | --- | --- | --- | --- |
+| 2026-10-21 | Created a branch that tracked `origin/main`, so a docs commit meant for a PR was pushed straight to `main`; then broke git config while fixing it ([details](#2026-10-21-a-branch-that-pushed-to-main)) | The user, seeing the commit on `main` | Repo set to `branch.autoSetupMerge=false`; the commit was left on `main` |
 | 2026-10-21 | The duplicate-order test only covered a repeated `x-requestid`, not two different ids | The user, while reviewing the test-strategy branch | The user wrote the different-id case in `OrderingApiTests` |
 | 2026-10-21 | Gave PowerShell users bash syntax (`S=...` is not recognized) | The user, from the error | Re-issued the commands in PowerShell |
 | 2026-10-20 | Rewrote mocks into fakes that kept the same flaws ([details](#2026-10-20-fakes-that-lie)) | The review step in `implement-spec`, then the user's decision | Deleted one fake, turned another into a stub, added the rule to `CLAUDE.md` |
@@ -15,6 +16,18 @@ To add an entry, put a row at the top of the table, and add a section below if t
 | 2026-10-06 | Gave PowerShell users bash syntax (`Missing expression after unary operator '!'`) | The user, from the error | Re-issued the command |
 | 2026-10-05 | A `dotnet format` hook on every edit, about 7 seconds each | The user ("That is too much") | Moved to run before commit, then folded into the verify gate |
 | 2026-10-05 | Pushed on to the next workflow step after a grilling session | The user | Saved as a standing instruction: stop at each skill's boundary |
+
+## 2026-10-21: A branch that pushed to main
+
+To open a PR for this log, the agent created the branch with `git switch -c docs/correction-log origin/main`. Git set the new branch to track `origin/main`, and the command's output said so ("set up to track 'origin/main'"), but the agent didn't act on it. The commit was later pushed and followed that tracking setting, so it landed directly on the fork's `main` with no PR. A separate, older problem hid it: local `main` tracked dotnet/eShop's `upstream/main`, so `git status` on `main` never showed that it was behind the fork.
+
+While fixing it, the agent set `branch.autoSetupMerge simple`. Git 2.35 doesn't support that value but saved it anyway, and every git command then failed until the agent removed it.
+
+**Caught by:** the user, who found the commit on `main` and the local `main` out of date.
+
+**Fix:** local `main` now tracks `origin/main`. The repo has `branch.autoSetupMerge=false`, so a new branch never tracks the branch it starts from, and its first push needs `git push -u origin <branch>`. The user chose to leave the commit on `main` rather than force-push.
+
+**Lesson:** read the output of setup commands, not only the exit code. Check the installed tool version before using a config value, because Git saved an unsupported value without complaint. Before a push, check where the branch actually points (`git branch -vv`).
 
 ## 2026-10-20: Fakes that lie
 
