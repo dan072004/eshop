@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using eShop.Assistant.Tools.Catalog;
+using eShop.Assistant.Tools.Ordering;
 using eShop.Assistant.Tools.Policy;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -11,7 +12,7 @@ namespace eShop.Assistant.Tools;
 /// to pass into <see cref="ChatOptions.Tools"/> or wrap as MCP tools. Resolve it from DI after
 /// <see cref="AssistantToolsServiceCollectionExtensions.AddAssistantTools"/>.
 /// </summary>
-public sealed class AssistantTools
+public sealed partial class AssistantTools
 {
     private const int CatalogSearchPageSize = 8;
     private const int PolicySearchTop = 5;
@@ -27,13 +28,23 @@ public sealed class AssistantTools
 
     private readonly CatalogClient _catalog;
     private readonly PolicyClient _policy;
+    private readonly OrderingClient _ordering;
+    private readonly TimeProvider _timeProvider;
     private readonly ProductPictureUrl? _pictureUrl;
     private readonly ILogger _logger;
 
-    public AssistantTools(CatalogClient catalog, PolicyClient policy, ILogger<AssistantTools> logger, ProductPictureUrl? pictureUrl = null)
+    public AssistantTools(
+        CatalogClient catalog,
+        PolicyClient policy,
+        OrderingClient ordering,
+        TimeProvider timeProvider,
+        ILogger<AssistantTools> logger,
+        ProductPictureUrl? pictureUrl = null)
     {
         _catalog = catalog;
         _policy = policy;
+        _ordering = ordering;
+        _timeProvider = timeProvider;
         _pictureUrl = pictureUrl;
         _logger = logger;
 
@@ -49,11 +60,21 @@ public sealed class AssistantTools
             Description = "Searches the AdventureWorks catalog for a provided product description",
         });
 
-        All = [SearchPolicies, SearchCatalog];
+        ListMyOrders = AIFunctionFactory.Create(ListMyOrdersAsync, new AIFunctionFactoryOptions
+        {
+            Name = AssistantToolNames.ListMyOrders,
+            Description = "Lists the signed-in Buyer's own AdventureWorks orders, newest first, with today's date (UTC). "
+                + "Each order has its order number, Order Date, status and total.",
+        });
+
+        All = [SearchPolicies, ListMyOrders, SearchCatalog];
     }
 
     /// <summary><c>search_policies(question)</c>.</summary>
     public AIFunction SearchPolicies { get; }
+
+    /// <summary><c>list_my_orders()</c>.</summary>
+    public AIFunction ListMyOrders { get; }
 
     /// <summary><c>search_catalog(productDescription)</c>.</summary>
     public AIFunction SearchCatalog { get; }

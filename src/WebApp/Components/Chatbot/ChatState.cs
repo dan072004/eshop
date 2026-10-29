@@ -42,6 +42,7 @@ public class ChatState
                 AIFunctionFactory.Create(GetUserInfo),
                 assistantTools.SearchPolicies,
                 assistantTools.SearchCatalog,
+                assistantTools.ListMyOrders,
                 AIFunctionFactory.Create(AddToCart),
                 AIFunctionFactory.Create(GetCartContents),
             ],

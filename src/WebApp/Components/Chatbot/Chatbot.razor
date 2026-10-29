@@ -9,6 +9,7 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ILoggerFactory LoggerFactory
 @inject IServiceProvider ServiceProvider
+@inject eShop.WebApp.Services.AccessTokens.AccessTokenHolder AccessTokenHolder
 
 <div class="floating-pane" id="chatbot-pane" role="dialog" aria-label="Shopping assistant">
     <header class="chatbot-header" data-chat-drag-handle>
@@ -97,6 +98,13 @@
     string? messageToSend;
     bool thinking;
     IJSObjectReference? jsModule;
+
+    /// <summary>The Buyer's access token, read by the statically rendered parent while HttpContext was valid.</summary>
+    [Parameter]
+    public string? AccessToken { get; set; }
+
+    // Runs again when enhanced navigation re-renders the parent with fresh parameters, so a renewed token is picked up.
+    protected override void OnParametersSet() => AccessTokenHolder.AccessToken = AccessToken;
 
     protected override async Task OnInitializedAsync()
     {
