@@ -53,6 +53,8 @@ builder.AddDotnetProject("order-processor", "../OrderProcessor")
 builder.AddDotnetProject("payment-processor", "../PaymentProcessor")
     .WithReference(rabbitMq).WaitFor(rabbitMq);
 
+var policyApi = builder.AddPolicyApi(postgres);
+
 var webHooksApi = builder.AddDotnetProject("webhooks-api", "../Webhooks.API")
     .WithReference(rabbitMq).WaitFor(rabbitMq)
     .WithReference(webhooksDb)
@@ -74,6 +76,7 @@ var webApp = builder.AddDotnetProject("webapp", "../WebApp", o => o.LaunchProfil
     .WithReference(basketApi)
     .WithReference(catalogApi)
     .WithReference(orderingApi)
+    .WithPolicySearch(policyApi)
     .WithReference(rabbitMq).WaitFor(rabbitMq)
     .WaitFor(identityApi)
     .WithEnvironment("IdentityUrl", identityEndpoint);

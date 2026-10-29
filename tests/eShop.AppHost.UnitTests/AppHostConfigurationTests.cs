@@ -51,6 +51,39 @@ public class AppHostConfigurationTests
     }
 
     [TestMethod]
+    public async Task PolicyApiGetsItsOwnPolicyDbOnThePostgresServerAndWaitsForIt()
+    {
+        var builder = CreateBuilder();
+        var postgres = builder.AddPostgres("postgres");
+
+        var policyApi = builder.AddPolicyApi(postgres, ProjectPath("Policy.API", "Policy.API.csproj"));
+
+        Assert.AreEqual("policy-api", policyApi.Resource.Name);
+        var policyDb = builder.Resources.OfType<PostgresDatabaseResource>().Single(db => db.Name == "policydb");
+        Assert.AreSame(postgres.Resource, policyDb.Parent);
+
+        var environment = await EnvironmentOf(builder, policyApi);
+        Assert.AreEqual("{policydb.connectionString}", environment["ConnectionStrings__policydb"]);
+
+        Assert.IsTrue(policyApi.Resource.Annotations.OfType<WaitAnnotation>().Any(wait => wait.Resource == policyDb));
+        Assert.IsTrue(policyApi.Resource.Annotations.OfType<HealthCheckAnnotation>().Any());
+    }
+
+    [TestMethod]
+    public async Task WebAppReferencesPolicyApiByItsServiceName()
+    {
+        var builder = CreateBuilder();
+        var policyApi = builder.AddPolicyApi(builder.AddPostgres("postgres"), ProjectPath("Policy.API", "Policy.API.csproj"));
+        var webApp = builder.AddDotnetProject("webapp", ProjectPath("WebApp", "WebApp.csproj"));
+
+        webApp.WithPolicySearch(policyApi);
+
+        // The shared tools library's PolicyClient resolves https+http://policy-api through this service-discovery entry.
+        var environment = await EnvironmentOf(builder, webApp);
+        Assert.AreEqual("{policy-api.bindings.http.url}", environment["services__policy-api__http__0"]);
+    }
+
+    [TestMethod]
     [DataRow(null, DisplayName = "missing")]
     [DataRow("", DisplayName = "empty")]
     [DataRow("None")]
@@ -271,9 +304,12 @@ public class AppHostConfigurationTests
         environment.Keys.Any(key => key.StartsWith("ConnectionStrings__", StringComparison.Ordinal));
 
     // Publish mode renders references as manifest expressions, so nothing has to be provisioned or started.
-    private async Task<Dictionary<string, string>> EnvironmentOf(AppModel app, IResourceBuilder<DotnetProjectResource> project)
+    private Task<Dictionary<string, string>> EnvironmentOf(AppModel app, IResourceBuilder<DotnetProjectResource> project) =>
+        EnvironmentOf(app.Builder, project);
+
+    private async Task<Dictionary<string, string>> EnvironmentOf(IDistributedApplicationBuilder builder, IResourceBuilder<DotnetProjectResource> project)
     {
-        using var services = app.Builder.Services.BuildServiceProvider();
+        using var services = builder.Services.BuildServiceProvider();
         var executionContext = new DistributedApplicationExecutionContext(
             new DistributedApplicationExecutionContextOptions(DistributedApplicationOperation.Publish) { Services = services });
 

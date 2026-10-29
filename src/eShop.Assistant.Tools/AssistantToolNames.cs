@@ -6,6 +6,8 @@
 /// </summary>
 public static class AssistantToolNames
 {
+    public const string SearchPolicies = "search_policies";
     public const string ListMyOrders = "list_my_orders";
+
     public const string SearchCatalog = "search_catalog";
 }
