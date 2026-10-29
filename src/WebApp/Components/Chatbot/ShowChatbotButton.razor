@@ -1,4 +1,5 @@
 @using eShop.WebApp.Components.Chatbot
+@using Microsoft.AspNetCore.Authentication
 
 <button type="button" class="show-chatbot" data-chat-toggle data-chat-eyes aria-controls="chatbot-pane" aria-expanded="false" title="Ask the assistant" aria-label="Ask the assistant">
     <span class="chatbot-eyes" aria-hidden="true">
@@ -16,5 +17,23 @@
 </button>
 
 <div class="chatbot-dock" data-chat-dock>
-    <Chatbot />
+    <Chatbot AccessToken="@accessToken" />
 </div>
+
+@code {
+    // This component renders statically on the server, where HttpContext is valid. The interactive Chatbot can't rely
+    // on HttpContext, so the Buyer's token is read here and handed to it as a parameter (Blazor data-protects the
+    // parameters of interactive Server components in the page).
+    [CascadingParameter]
+    public HttpContext? HttpContext { get; set; }
+
+    string? accessToken;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext is not null)
+        {
+            accessToken = await HttpContext.GetTokenAsync("access_token");
+        }
+    }
+}
