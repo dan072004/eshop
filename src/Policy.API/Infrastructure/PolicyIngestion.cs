@@ -1,5 +1,8 @@
 ﻿using System.Security.Cryptography;
+using eShop.Policy.API.Services;
 using Microsoft.Extensions.Options;
+using Npgsql;
+using Pgvector;
 
 namespace eShop.Policy.API.Infrastructure;
 
@@ -14,23 +17,23 @@ namespace eShop.Policy.API.Infrastructure;
 /// </remarks>
 public sealed class PolicyIngestion(
     PolicyContext context,
+    PolicyEmbeddings embeddings,
     IOptions<PolicyOptions> options,
     TimeProvider timeProvider,
     ILogger<PolicyIngestion> logger)
 {
-    /// <summary>The embedding model id stored when no embedding provider is configured.</summary>
-    public const string NoEmbeddingModel = "none";
-
     private const string AdvisoryLockKey = "policy-ingestion";
-
-    /// <summary>The model the Policy Sections are embedded with. Without a provider, sections are stored with no vector.</summary>
-    private static string CurrentEmbeddingModelId => NoEmbeddingModel;
 
     public async Task IngestAsync(CancellationToken cancellationToken = default)
     {
         var folder = options.Value.Folder;
         var files = ReadPolicyFiles(folder);
-        var embeddingModelId = CurrentEmbeddingModelId;
+        var embeddingModelId = embeddings.ModelId;
+
+        // The migration may have just created the vector extension on this connection; Npgsql only knows
+        // the vector type once it reloads types (workaround from https://github.com/npgsql/efcore.pg/issues/292).
+        await context.Database.OpenConnectionAsync(cancellationToken);
+        await ((NpgsqlConnection)context.Database.GetDbConnection()).ReloadTypesAsync(cancellationToken);
 
         var strategy = context.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
@@ -52,7 +55,8 @@ public sealed class PolicyIngestion(
             await context.Policies.Where(p => toDelete.Contains(p.Slug)).ExecuteDeleteAsync(cancellationToken);
 
             var indexedAt = timeProvider.GetUtcNow();
-            context.Policies.AddRange(toIndex.Select(f => ToIndexedPolicy(f, embeddingModelId, indexedAt)));
+            var vectors = await EmbedSectionsAsync(toIndex, cancellationToken);
+            context.Policies.AddRange(toIndex.Select(f => ToIndexedPolicy(f, embeddingModelId, indexedAt, vectors)));
             await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
@@ -62,7 +66,21 @@ public sealed class PolicyIngestion(
         });
     }
 
-    private static IndexedPolicy ToIndexedPolicy(PolicyFile file, string embeddingModelId, DateTimeOffset indexedAt) => new()
+    // Only new or changed Policies are embedded; without a provider, sections are stored with no vector.
+    private async Task<IReadOnlyDictionary<PolicySection, Vector>> EmbedSectionsAsync(List<PolicyFile> toIndex, CancellationToken cancellationToken)
+    {
+        if (!embeddings.IsEnabled)
+        {
+            return new Dictionary<PolicySection, Vector>();
+        }
+
+        var sections = toIndex.SelectMany(f => f.Policy.Sections).ToList();
+        var vectors = await embeddings.EmbedAsync(sections.Select(s => s.IndexedText).ToList(), cancellationToken);
+        return sections.Zip(vectors).ToDictionary<(PolicySection First, Vector Second), PolicySection, Vector>(
+            pair => pair.First, pair => pair.Second, ReferenceEqualityComparer.Instance);
+    }
+
+    private static IndexedPolicy ToIndexedPolicy(PolicyFile file, string embeddingModelId, DateTimeOffset indexedAt, IReadOnlyDictionary<PolicySection, Vector> vectors) => new()
     {
         Slug = file.Policy.Slug,
         Title = file.Policy.Title,
@@ -79,7 +97,7 @@ public sealed class PolicyIngestion(
             Anchor = section.Anchor,
             Body = section.Body,
             IndexedText = section.IndexedText,
-            Embedding = null,
+            Embedding = vectors.GetValueOrDefault(section),
         }).ToList(),
     };
 
