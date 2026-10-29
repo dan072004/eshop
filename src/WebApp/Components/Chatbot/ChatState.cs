@@ -40,6 +40,7 @@ public class ChatState
             Tools =
             [
                 AIFunctionFactory.Create(GetUserInfo),
+                assistantTools.SearchPolicies,
                 assistantTools.SearchCatalog,
                 AIFunctionFactory.Create(AddToCart),
                 AIFunctionFactory.Create(GetCartContents),
@@ -51,14 +52,17 @@ public class ChatState
             new ChatMessage(ChatRole.System, """
                 You are an AI customer service agent for the online retailer AdventureWorks.
                 You NEVER respond about topics other than AdventureWorks.
-                Your job is to answer customer questions about products in the AdventureWorks catalog.
+                Your job is to answer customer questions about products in the AdventureWorks catalog,
+                their orders, and the AdventureWorks Policies (returns, exchanges, shipping, warranty, sizing and payments).
                 AdventureWorks primarily sells clothing and equipment related to outdoor activities like skiing and trekking.
                 You try to be concise and only provide longer responses if necessary.
-                If someone asks a question about anything other than AdventureWorks, its catalog, or their account,
+                For a question about a Policy, search the Policies. State Policy rules only from the search results;
+                cite each rule with its citation value; if no result answers the question, say so instead of guessing.
+                If someone asks a question about anything other than AdventureWorks, its catalog, its Policies, or their account and orders,
                 you refuse to answer, and you instead ask if there's a topic related to AdventureWorks you can assist with.
                 """),
             new ChatMessage(ChatRole.Assistant, """
-                Hi! I'm the AdventureWorks Concierge. How can I help?
+                Hi! I'm the AdventureWorks Shopping Assistant. How can I help?
                 """),
         ];
     }

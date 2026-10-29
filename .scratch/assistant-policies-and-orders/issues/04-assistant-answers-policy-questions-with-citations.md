@@ -10,10 +10,20 @@
 
 **Status:** ready-for-agent
 
-- [ ] `search_policies` is in the library with the contract's name, parameter name and description
-- [ ] Fast tests at the `AIFunction` seam (fake outbound `HttpMessageHandler`): `citation` and `mode` are passed through as returned; a failure from policy-api becomes the `unavailable` error result
-- [ ] The Shopping Assistant offers `search_policies` alongside its existing tools
-- [ ] The greeting no longer says "Concierge"
-- [ ] AppHost unit test: WebApp references policy-api
+- [x] `search_policies` is in the library with the contract's name, parameter name and description
+- [x] Fast tests at the `AIFunction` seam (fake outbound `HttpMessageHandler`): `citation` and `mode` are passed through as returned; a failure from policy-api becomes the `unavailable` error result
+- [x] The Shopping Assistant offers `search_policies` alongside its existing tools
+- [x] The greeting no longer says "Concierge"
+- [x] AppHost unit test: WebApp references policy-api
 - [ ] Manual, with `ChatProvider=Claude` and `EmbeddingProvider=None`: "can I return a GPS watch after 45 days?" gets an answer citing *Returns Exceptions › GPS watches, navigators and bike computers*
 - [ ] Manual: signed out, a Policy question still gets a cited answer
+
+## Comments
+
+- Implemented on `ticket/04-policy-tool`. Names later tickets and eShop.Mcp build on:
+  - `eShop.Assistant.Tools.Policy.PolicyClient` (base address `https+http://policy-api`, no token, no api-version) with `SearchAsync(question, top, ct)` returning `PolicySearchResult(Mode, Results)` of `PolicySectionMatch(Citation, PolicySlug, PolicyTitle, Section, Anchor, Text, Score)`, mirroring policy-api's response.
+  - `AssistantToolsBuilder.PolicyClient` (IHttpClientBuilder); `AssistantTools.SearchPolicies`; `AssistantToolNames.SearchPolicies`; the contract description is `AssistantTools.SearchPoliciesDescription`. `All` is in contract order: `[SearchPolicies, SearchCatalog]`; tickets 06/07 insert `ListMyOrders`, `GetOrder` between them.
+  - A policy-api failure returns `{ "error": "unavailable", "message": "Error searching the Policies." }`.
+- AppHost: the WebApp → policy-api reference moved from top-level `AppHost.cs` into `WithPolicySearch(policyApi)` in `src/eShop.AppHost/Extensions.cs`, because the unit tests can't reach top-level statements (no Aspire.Hosting.Testing). eShop.Mcp can use the same extension. Test: `WebAppReferencesPolicyApiByItsServiceName`.
+- WebApp: `ShoppingAssistantTests` (WebApp.UnitTests) fakes only `IChatClient` and checks the offered tool names, the greeting and the citation backstop in the system prompt. Ticket 06 can add `list_my_orders` to its expected tool list.
+- Manual acceptance items not run here (need `ChatProvider=Claude` and an API key).
