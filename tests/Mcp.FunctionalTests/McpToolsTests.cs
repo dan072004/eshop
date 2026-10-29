@@ -1,5 +1,7 @@
 ﻿using System.Net;
 using System.Text.Json;
+using eShop.Assistant.Tools;
+using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 
@@ -42,6 +44,11 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
 
         var tools = await client.ListToolsAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // The descriptions are the shared library's, passed through unchanged.
+        using var scope = fixture.Services.CreateScope();
+        var libraryDescriptions = scope.ServiceProvider.GetRequiredService<AssistantTools>().All
+            .ToDictionary(f => f.Name, f => f.Description);
+
         // The tool contract (spec): names and parameter names, nothing added by eShop.Mcp.
         var expected = new Dictionary<string, string[]>
         {
@@ -61,7 +68,7 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
                 : [];
             Assert.Equal(expected[tool.Name], parameters);
             Assert.Equal(expected[tool.Name], required);
-            Assert.False(string.IsNullOrWhiteSpace(tool.Description));
+            Assert.Equal(libraryDescriptions[tool.Name], tool.Description);
             Assert.Null(tool.ProtocolTool.OutputSchema);
         }
     }
@@ -99,7 +106,7 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
     {
         fixture.Ordering.Reset();
         fixture.Ordering.Respond = _ => RecordingHandler.Json(OrderWithoutItems);
-        var aliceToken = fixture.MintToken("alice", audiences: ["eshop-mcp", "orders"]);
+        var aliceToken = fixture.MintToken("alice");
         await using var client = await ConnectAsync(new BearerHandler { Token = aliceToken });
 
         var result = await client.CallToolAsync(
@@ -119,8 +126,8 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
     {
         fixture.Ordering.Reset();
         fixture.Ordering.Respond = _ => RecordingHandler.Json("[]");
-        var aliceToken = fixture.MintToken("alice", audiences: ["eshop-mcp", "orders"]);
-        var bobToken = fixture.MintToken("bob", audiences: ["eshop-mcp", "orders"]);
+        var aliceToken = fixture.MintToken("alice");
+        var bobToken = fixture.MintToken("bob");
         var bearer = new BearerHandler { Token = aliceToken };
         await using var client = await ConnectAsync(bearer);
 
@@ -151,6 +158,29 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
         var text = Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text;
         using var json = JsonDocument.Parse(text);
         Assert.Equal("not_found", json.RootElement.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task TokenWithoutTheOrdersAudienceIsNotForwardedAndTheOrderToolsAskTheBuyerToSignIn()
+    {
+        // Ordering.API doesn't validate the audience, so it would accept this token; eShop.Mcp must not pass it on (ADR 0005).
+        fixture.Ordering.Reset();
+        fixture.Ordering.Respond = _ => RecordingHandler.Json("[]");
+        await using var client = await ConnectAsync(new BearerHandler { Token = fixture.MintToken("alice", audiences: ["eshop-mcp"]) });
+
+        var listed = await client.CallToolAsync("list_my_orders", cancellationToken: TestContext.Current.CancellationToken);
+        var got = await client.CallToolAsync(
+            "get_order",
+            new Dictionary<string, object?> { ["orderNumber"] = 17 },
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Empty(fixture.Ordering.Requests);
+        foreach (var result in new[] { listed, got })
+        {
+            var text = Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text;
+            using var json = JsonDocument.Parse(text);
+            Assert.Equal("sign_in_required", json.RootElement.GetProperty("error").GetString());
+        }
     }
 
     [Fact]
@@ -200,20 +230,6 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
         }
     }
 
-    private async Task<McpClient> ConnectAsBuyerAsync(string subject)
-    {
-        var token = fixture.MintToken(subject, audiences: ["eshop-mcp", "orders"]);
-        var httpClient = fixture.CreateClient();
-        var transport = new HttpClientTransport(
-            new HttpClientTransportOptions
-            {
-                Endpoint = new Uri(httpClient.BaseAddress!, "/mcp"),
-                TransportMode = HttpTransportMode.StreamableHttp,
-                AdditionalHeaders = new Dictionary<string, string> { ["Authorization"] = $"Bearer {token}" },
-            },
-            httpClient,
-            ownsHttpClient: true);
-
-        return await McpClient.CreateAsync(transport, cancellationToken: TestContext.Current.CancellationToken);
-    }
+    private Task<McpClient> ConnectAsBuyerAsync(string subject) =>
+        ConnectAsync(new BearerHandler { Token = fixture.MintToken(subject) });
 }

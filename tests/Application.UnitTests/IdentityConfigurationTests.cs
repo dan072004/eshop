@@ -1,4 +1,4 @@
-using eShop.Identity.API.Configuration;
+﻿using eShop.Identity.API.Configuration;
 using eShop.Identity.API.Services;
 using Microsoft.Extensions.Configuration;
 
@@ -14,7 +14,7 @@ public class IdentityConfigurationTests
         var scopes = Config.GetApiScopes().Select(scope => scope.Name).Order().ToArray();
 
         CollectionAssert.AreEqual(resources, scopes);
-        CollectionAssert.AreEquivalent(new[] { "basket", "orders", "webhooks" }, scopes);
+        CollectionAssert.AreEquivalent(new[] { "basket", "eshop-mcp", "orders", "webhooks" }, scopes);
     }
 
     [TestMethod]
@@ -27,7 +27,8 @@ public class IdentityConfigurationTests
             ["WebhooksWebClient"] = "https://webhooks-client.test",
             ["BasketApiClient"] = "https://basket.test",
             ["OrderingApiClient"] = "https://ordering.test",
-            ["WebhooksApiClient"] = "https://webhooks.test"
+            ["WebhooksApiClient"] = "https://webhooks.test",
+            ["ClaudeCodeCallbackPort"] = "33419"
         };
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
 

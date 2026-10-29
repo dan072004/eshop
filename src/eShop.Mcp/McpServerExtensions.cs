@@ -69,11 +69,15 @@ internal static class McpServerExtensions
     /// The MCP server: Streamable HTTP in stateless mode, so every tool call is authorised by the token on that
     /// request (ADR 0005). The tools are the shared library's <see cref="AIFunction"/>s, wrapped unchanged.
     /// </summary>
-    public static IHostApplicationBuilder AddMcpServer(this IHostApplicationBuilder builder)
+    public static IHostApplicationBuilder AddEshopMcpServer(this IHostApplicationBuilder builder)
     {
-        // Only Ordering needs the Buyer: it gets the caller's own validated token, read back from this request.
-        // The policy and catalog clients send no token. Ordering.API keeps the ownership check.
-        builder.Services.AddAssistantTools().OrderingClient.AddAuthToken();
+        // Only Ordering needs the Buyer: it gets the caller's own validated token, read back from this request, and
+        // only if that token names the "orders" audience. The policy and catalog clients send no token.
+        // Ordering.API keeps the ownership check.
+        builder.Services.AddTransient<OrdersAudienceHandler>();
+        builder.Services.AddAssistantTools().OrderingClient
+            .AddHttpMessageHandler<OrdersAudienceHandler>()
+            .AddAuthToken();
 
         builder.Services.AddMcpServer()
             .WithHttpTransport(options =>

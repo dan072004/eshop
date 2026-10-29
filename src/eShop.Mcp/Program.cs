@@ -5,7 +5,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddBuyerAuthentication();
-builder.AddMcpServer();
+builder.AddEshopMcpServer();
 
 var app = builder.Build();
 

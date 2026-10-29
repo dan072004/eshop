@@ -82,15 +82,16 @@ For "what's the return window for my last order?" in Claude Code, on a shipped o
   - `SaveToken` is on, so the existing token-forwarding handler (`AddAuthToken`) can read the validated token from the request.
   - Protected resource metadata (RFC 9728) through the SDK's MCP authentication handler. `resource` is eShop.Mcp's own URL, exactly as clients enter it. `authorization_servers` holds only the injected Identity URL. `scopes_supported` lists `openid`, `profile`, `offline_access`, `eshop-mcp` and `orders`.
   - An unauthenticated or rejected request gets HTTP 401 with `WWW-Authenticate: Bearer resource_metadata="…"`.
-- **Outbound HTTP.** The library's typed clients reach `policy-api`, `catalog-api` (v2) and `ordering-api` (v1) by Aspire service name. eShop.Mcp attaches `AddAuthToken()` to the Ordering client only. The Policy and catalog clients send no token.
+- **Outbound HTTP.** The library's typed clients reach `policy-api`, `catalog-api` (v2) and `ordering-api` (v1) by Aspire service name. eShop.Mcp attaches `AddAuthToken()` to the Ordering client only, and forwards a token only if it names the `orders` audience (otherwise the order tools return `sign_in_required` without calling Ordering). The Policy and catalog clients send no token.
 - eShop.Mcp has no database, no event bus subscription and no state of its own.
 
 **Identity.API (configuration only)**
 
 - New API resource and scope `eshop-mcp`.
+- The existing `orders` API resource lists `Scopes = { "orders" }`, so that a token requesting the `orders` scope names `orders` as an audience (Duende 7 takes audiences from the resources whose `Scopes` contain a requested scope; `orders` listed none). Side effect: WebApp and MAUI tokens gain `aud: orders` too, which nothing validates against today. Recorded in ADR 0005.
 - Two new clients, with no change to existing ones:
   - `claude-code`: public client (no secret), authorization code with PKCE (S256), consent required and remembered, offline access with refresh-token rotation. Redirect URIs `http://localhost:{port}/callback` and `http://127.0.0.1:{port}/callback` on one fixed port (the earlier Claude Code release used the `127.0.0.1` form).
-  - `vscode`: the same settings, with redirect URIs `http://127.0.0.1:33418` and `https://vscode.dev/redirect`.
+  - `vscode`: the same settings, with redirect URIs `http://127.0.0.1:33418`, `http://127.0.0.1:33418/` (VS Code's own registration uses the trailing slash, and Duende matches exactly) and `https://vscode.dev/redirect`.
   - Allowed scopes for both: `openid`, `profile`, `offline_access`, `eshop-mcp`, `orders`.
 - The Claude Code callback port is a setting with a default, so a developer whose port is taken can change it in one place.
 - The resulting access token names both `eshop-mcp` and `orders` as audiences. Ordering.API needs no change to accept it.
@@ -126,6 +127,7 @@ The MCP caller is a **Buyer**. eShop.Mcp is not the **Shopping Assistant**, whic
     - `tools/list` returns exactly `search_policies`, `search_catalog`, `list_my_orders` and `get_order`, with the contract's parameter names.
     - `get_order` for Buyer A reaches Ordering with Buyer A's token as Bearer. Calls with Buyer A's and Buyer B's tokens, made one after the other on the same client, each reach Ordering with their own token.
     - Ordering's 404 comes back as the `not_found` error result.
+    - A token naming only `eshop-mcp` → `list_my_orders` and `get_order` return `sign_in_required`, and Ordering receives no request.
     - `search_policies` and `search_catalog` reach their backends with no `Authorization` header.
     - Catalog results through eShop.Mcp have no `pictureUrl`.
   - Each tool's result shape is not tested again here. It is covered by the library's tests at the `AIFunction` seam.

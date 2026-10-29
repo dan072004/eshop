@@ -53,7 +53,7 @@ public sealed class McpAuthenticationTests(McpServerFixture fixture) : IClassFix
     [Fact]
     public async Task ExpiredTokenIsRejected()
     {
-        var token = fixture.MintToken("alice", audiences: ["eshop-mcp", "orders"], expires: DateTime.UtcNow.AddMinutes(-10));
+        var token = fixture.MintToken("alice", expires: DateTime.UtcNow.AddMinutes(-10));
         using var client = fixture.CreateClient();
 
         using var response = await client.SendAsync(McpRequest(token), TestContext.Current.CancellationToken);
@@ -64,7 +64,7 @@ public sealed class McpAuthenticationTests(McpServerFixture fixture) : IClassFix
     [Fact]
     public async Task TokenFromAnotherIssuerIsRejected()
     {
-        var token = fixture.MintToken("alice", audiences: ["eshop-mcp", "orders"], issuer: "http://elsewhere.test");
+        var token = fixture.MintToken("alice", issuer: "http://elsewhere.test");
         using var client = fixture.CreateClient();
 
         using var response = await client.SendAsync(McpRequest(token), TestContext.Current.CancellationToken);

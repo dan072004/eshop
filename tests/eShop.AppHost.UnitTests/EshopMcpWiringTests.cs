@@ -34,7 +34,10 @@ public class EshopMcpWiringTests
         Assert.AreEqual(orderingEnvironment["Identity__Url"], environment["Identity__Url"]);
 
         Assert.IsTrue(mcp.Annotations.OfType<WaitAnnotation>().Any(wait => wait.Resource.Name == "identity-api"));
-        Assert.IsTrue(mcp.Annotations.OfType<HealthCheckAnnotation>().Any());
+        // WithHttpHealthCheck keys its check "{resource}_{endpoint}_{path}_{status}_check": GET /health on the
+        // https endpoint, expecting 200.
+        var healthCheck = mcp.Annotations.OfType<HealthCheckAnnotation>().Single();
+        Assert.AreEqual("eshop-mcp_https_/health_200_check", healthCheck.Key);
     }
 
     [TestMethod]

@@ -17,9 +17,11 @@ using Microsoft.IdentityModel.Tokens;
 namespace eShop.Mcp.FunctionalTests;
 
 /// <summary>
-/// eShop.Mcp in a <see cref="WebApplicationFactory{TEntryPoint}"/>. Identity.API is not started: JWT validation trusts
-/// a test signing key and tests mint their own Buyer tokens. The outbound handlers behind the policy-api, Catalog and
-/// Ordering clients are faked.
+/// eShop.Mcp in a <see cref="WebApplicationFactory{TEntryPoint}"/>, with no containers. Identity.API is not started:
+/// a real Buyer token needs the interactive code flow, and a password grant only for tests would change an existing
+/// service. So the token issuer is faked, as the spec's Testing Decisions say: JWT validation trusts a test signing key
+/// and tests mint their own Buyer tokens. eShop.Mcp has no database or event bus, and the outbound handlers behind the
+/// policy-api, Catalog and Ordering clients are faked.
 /// </summary>
 public sealed class McpServerFixture : WebApplicationFactory<Program>
 {
@@ -60,8 +62,11 @@ public sealed class McpServerFixture : WebApplicationFactory<Program>
         });
     }
 
-    /// <summary>Mints a token as Identity.API would issue it, signed by the test key.</summary>
-    public string MintToken(string subject, string[] audiences, DateTime? expires = null, string issuer = IdentityUrl)
+    /// <summary>
+    /// Mints a token as Identity.API would issue it, signed by the test key. By default it names both audiences an MCP
+    /// client's token carries (ADR 0005).
+    /// </summary>
+    public string MintToken(string subject, string[]? audiences = null, DateTime? expires = null, string issuer = IdentityUrl)
     {
         var expiry = expires ?? DateTime.UtcNow.AddHours(1);
         var descriptor = new SecurityTokenDescriptor
@@ -73,7 +78,7 @@ public sealed class McpServerFixture : WebApplicationFactory<Program>
             Claims = new Dictionary<string, object>
             {
                 ["sub"] = subject,
-                ["aud"] = audiences,
+                ["aud"] = audiences ?? ["eshop-mcp", "orders"],
                 ["scope"] = new[] { "openid", "profile", "eshop-mcp", "orders" },
             },
             SigningCredentials = new SigningCredentials(_signingKey, SecurityAlgorithms.RsaSha256),
