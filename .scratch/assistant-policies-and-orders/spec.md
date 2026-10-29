@@ -129,6 +129,7 @@ For "what's the return window for my last order?" on a shipped order containing 
   - `get_order(orderNumber: int)`
     - Returns `{ today, orderNumber, orderDate, status, items: [ { productId, productName, units, unitPrice, type, brand } ] }`.
     - `type` and `brand` come from Catalog.API by `productId`. If an item can't be found in the catalog, they are `null`; the tool doesn't fail.
+    - If Catalog.API itself fails, the whole call returns `unavailable` rather than items with `null` types, so the model never gives a Return Window without the item types it depends on.
   - `search_catalog(productDescription: string)`
     - Same behaviour and result as the existing catalog search tool, except `pictureUrl`: the host may supply a function that turns a product id into an image URL. WebApp supplies its current one; with none supplied, `pictureUrl` is left out. (Contract change agreed in the eShop.Mcp grilling, because a WebApp-relative path means nothing to an MCP client.)
   - `today` is the current UTC date, so the model doesn't have to guess it. The tools contain no Policy rules: no "60 days" anywhere in code. Return Windows come from cited Policy Sections.

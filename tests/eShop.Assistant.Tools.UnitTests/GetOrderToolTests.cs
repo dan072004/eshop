@@ -1,5 +1,4 @@
 ﻿using System.Net;
-using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,7 +9,7 @@ namespace eShop.Assistant.Tools.UnitTests;
 public class GetOrderToolTests
 {
     // What Ordering.API v1 returns from GET api/orders/12 (its Order view model, web JSON casing).
-    private const string OrderingOrder = """
+    private const string OrderDetailsJson = """
         {
           "orderNumber": 12,
           "date": "2026-10-27T15:04:05Z",
@@ -52,7 +51,7 @@ public class GetOrderToolTests
     [TestMethod]
     public async Task GetOrderReturnsTheOrderWithEachItemsTypeAndBrandFromCatalog()
     {
-        var ordering = new FakeHandler(_ => Json(HttpStatusCode.OK, OrderingOrder));
+        var ordering = new FakeHandler(_ => Json(HttpStatusCode.OK, OrderDetailsJson));
         var catalog = CatalogHandler(CatalogItems);
         var tool = BuildTools(ordering, catalog).GetOrder;
 
@@ -90,7 +89,7 @@ public class GetOrderToolTests
         const string OnlyTheJacket = """
             [ { "id": 5, "name": "Alpine Fleece Jacket", "price": 45.5, "catalogTypeId": 2, "catalogBrandId": 9 } ]
             """;
-        var ordering = new FakeHandler(_ => Json(HttpStatusCode.OK, OrderingOrder));
+        var ordering = new FakeHandler(_ => Json(HttpStatusCode.OK, OrderDetailsJson));
         var tool = BuildTools(ordering, CatalogHandler(OnlyTheJacket)).GetOrder;
 
         var result = await InvokeAsync(tool, 12);
@@ -127,7 +126,7 @@ public class GetOrderToolTests
     public async Task GetOrderReturnsUnavailableWhenCatalogFails()
     {
         // Without types the model could apply the wrong Return Window, so a Catalog outage is not hidden as nulls.
-        var ordering = new FakeHandler(_ => Json(HttpStatusCode.OK, OrderingOrder));
+        var ordering = new FakeHandler(_ => Json(HttpStatusCode.OK, OrderDetailsJson));
         var catalog = new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
         var tool = BuildTools(ordering, catalog).GetOrder;
 
@@ -140,7 +139,7 @@ public class GetOrderToolTests
     [TestMethod]
     public void GetOrderHasTheContractNameAndParameterName()
     {
-        var tools = BuildTools(new FakeHandler(_ => Json(HttpStatusCode.OK, OrderingOrder)), CatalogHandler(CatalogItems));
+        var tools = BuildTools(new FakeHandler(_ => Json(HttpStatusCode.OK, OrderDetailsJson)), CatalogHandler(CatalogItems));
         var tool = tools.GetOrder;
 
         Assert.AreEqual("get_order", tool.Name);
@@ -175,28 +174,5 @@ public class GetOrderToolTests
     {
         var result = await tool.InvokeAsync(new AIFunctionArguments { ["orderNumber"] = orderNumber }, TestContext.CancellationToken);
         return result is JsonElement element ? element : JsonSerializer.SerializeToElement(result);
-    }
-
-    private static HttpResponseMessage Json(HttpStatusCode status, string body) =>
-        new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
-
-    // The clock is a boundary we don't own.
-    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
-    {
-        public override DateTimeOffset GetUtcNow() => now;
-    }
-
-    private sealed class FakeHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
-    {
-        public List<HttpRequestMessage> Requests { get; } = [];
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            lock (Requests)
-            {
-                Requests.Add(request);
-            }
-            return Task.FromResult(respond(request));
-        }
     }
 }

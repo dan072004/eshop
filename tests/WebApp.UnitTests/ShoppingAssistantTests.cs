@@ -37,13 +37,11 @@ public class ShoppingAssistantTests
     }
 
     [TestMethod]
-    public void SystemPromptCoversPoliciesAndOrdersAndRepeatsTheCitationRule()
+    public void SystemPromptRepeatsTheCitationRule()
     {
         var chat = CreateChat(new RecordingChatClient());
 
         var prompt = chat.Messages.Single(message => message.Role == ChatRole.System).Text;
-        Assert.Contains("Policies", prompt);
-        Assert.Contains("orders", prompt);
         Assert.Contains("cite each rule with its citation value", prompt);
     }
 

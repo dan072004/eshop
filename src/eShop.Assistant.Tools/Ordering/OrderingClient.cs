@@ -27,9 +27,9 @@ public sealed class OrderingClient(HttpClient httpClient)
     /// Ordering.API could not be reached or returned an error status; <see cref="HttpRequestException.StatusCode"/>
     /// is <see cref="System.Net.HttpStatusCode.NotFound"/> or <see cref="System.Net.HttpStatusCode.Unauthorized"/>.
     /// </exception>
-    public async Task<OrderingOrder> GetOrderAsync(int orderNumber, CancellationToken cancellationToken)
+    public async Task<OrderDetailsResponse> GetOrderAsync(int orderNumber, CancellationToken cancellationToken)
     {
-        var order = await httpClient.GetFromJsonAsync<OrderingOrder>($"api/orders/{orderNumber}", cancellationToken);
+        var order = await httpClient.GetFromJsonAsync<OrderDetailsResponse>($"api/orders/{orderNumber}", cancellationToken);
         return order ?? throw new HttpRequestException("Ordering.API returned an empty body.");
     }
 }
@@ -38,6 +38,6 @@ public sealed class OrderingClient(HttpClient httpClient)
 public sealed record OrderingOrderSummary(int OrderNumber, DateTime Date, string Status, decimal Total);
 
 /// <summary>The parts of Ordering.API's <c>Order</c> the tools use, as it is sent on the wire.</summary>
-public sealed record OrderingOrder(int OrderNumber, DateTime Date, string Status, IReadOnlyList<OrderingOrderItem>? OrderItems);
+public sealed record OrderDetailsResponse(int OrderNumber, DateTime Date, string Status, IReadOnlyList<OrderDetailsItemResponse>? OrderItems);
 
-public sealed record OrderingOrderItem(int ProductId, string ProductName, int Units, decimal UnitPrice);
+public sealed record OrderDetailsItemResponse(int ProductId, string ProductName, int Units, decimal UnitPrice);

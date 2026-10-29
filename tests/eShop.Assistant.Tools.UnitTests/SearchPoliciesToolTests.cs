@@ -1,5 +1,4 @@
 ﻿using System.Net;
-using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -93,6 +92,37 @@ public class SearchPoliciesToolTests
     }
 
     [TestMethod]
+    [DataRow("timeout")]
+    [DataRow("invalid-json")]
+    public async Task SearchPoliciesReturnsUnavailableForAnyOtherFailure(string failure)
+    {
+        var policy = new FakeHandler(_ => failure == "timeout"
+            ? throw new TaskCanceledException("The request timed out.")
+            : Json(HttpStatusCode.OK, "<html>not json</html>"));
+        var tool = BuildTools(policy).SearchPolicies;
+
+        var result = await InvokeAsync(tool, new() { ["question"] = "return window" });
+
+        Assert.AreEqual("unavailable", result.GetProperty("error").GetString());
+        Assert.AreEqual("Error searching the Policies.", result.GetProperty("message").GetString());
+    }
+
+    [TestMethod]
+    public async Task SearchPoliciesRethrowsTheCallersOwnCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var policy = new FakeHandler(_ =>
+        {
+            cancellation.Cancel();
+            throw new TaskCanceledException();
+        });
+        var tool = BuildTools(policy).SearchPolicies;
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await tool.InvokeAsync(new() { ["question"] = "return window" }, cancellation.Token));
+    }
+
+    [TestMethod]
     public void SearchPoliciesHasTheContractNameParameterAndCitationRule()
     {
         var tools = BuildTools(new FakeHandler(_ => Json(HttpStatusCode.OK, PolicySearchResponse)));
@@ -121,19 +151,5 @@ public class SearchPoliciesToolTests
     {
         var result = await tool.InvokeAsync(arguments, TestContext.CancellationToken);
         return result is JsonElement element ? element : JsonSerializer.SerializeToElement(result);
-    }
-
-    private static HttpResponseMessage Json(HttpStatusCode status, string body) =>
-        new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
-
-    private sealed class FakeHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
-    {
-        public List<HttpRequestMessage> Requests { get; } = [];
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            Requests.Add(request);
-            return Task.FromResult(respond(request));
-        }
     }
 }

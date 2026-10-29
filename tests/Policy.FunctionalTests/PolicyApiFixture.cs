@@ -1,5 +1,4 @@
 ﻿using System.IO;
-using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using eShop.Policy.API.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -22,11 +21,8 @@ public class PolicyApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 
     public PolicyApiFixture()
     {
-        var options = new DistributedApplicationOptions { AssemblyName = typeof(PolicyApiFixture).Assembly.FullName, DisableDashboard = true };
-        var appBuilder = DistributedApplication.CreateBuilder(options);
-        Postgres = appBuilder.AddPostgres("policydb")
-            .WithImage("ankane/pgvector")
-            .WithImageTag("latest");
+        var appBuilder = TestAppHost.CreateBuilder();
+        Postgres = appBuilder.AddPolicyPostgres();
         _app = appBuilder.Build();
     }
 
@@ -104,15 +100,7 @@ public class PolicyApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
     public new async Task DisposeAsync()
     {
         await base.DisposeAsync();
-        await _app.StopAsync();
-        if (_app is IAsyncDisposable asyncDisposable)
-        {
-            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
-        }
-        else
-        {
-            _app.Dispose();
-        }
+        await TestAppHost.StopAndDisposeAsync(_app);
 
         Directory.Delete(PoliciesFolder, recursive: true);
     }

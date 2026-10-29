@@ -107,25 +107,27 @@ internal static class Extensions
                 break;
         }
 
-        // Catalog.API and policy-api work out their embedding source from what they are given:
+        // Catalog.API and policy-api get the same embedding wiring, and work out their embedding source from it:
         // OllamaEnabled, or a textEmbeddingModel connection string.
+        void WireEmbeddingConsumers(Action<IResourceBuilder<DotnetProjectResource>> wire)
+        {
+            foreach (var consumer in new[] { catalogApi, policyApi })
+            {
+                wire(consumer);
+            }
+        }
+
         switch (embeddingProvider)
         {
             case EmbeddingProvider.Foundry:
                 var embeddingDeployment = GetOrAddFoundry().AddDeployment("textEmbeddingModel", "text-embedding-3-small", "1", "OpenAI");
-                foreach (var consumer in new[] { catalogApi, policyApi })
-                {
-                    consumer.WithReference(embeddingDeployment).WaitFor(embeddingDeployment);
-                }
+                WireEmbeddingConsumers(consumer => consumer.WithReference(embeddingDeployment).WaitFor(embeddingDeployment));
                 break;
             case EmbeddingProvider.Ollama:
                 var embeddingModel = GetOrAddOllama().AddModel("embedding", "all-minilm");
-                foreach (var consumer in new[] { catalogApi, policyApi })
-                {
-                    consumer.WithReference(embeddingModel)
-                        .WithEnvironment("OllamaEnabled", "true")
-                        .WaitFor(embeddingModel);
-                }
+                WireEmbeddingConsumers(consumer => consumer.WithReference(embeddingModel)
+                    .WithEnvironment("OllamaEnabled", "true")
+                    .WaitFor(embeddingModel));
                 break;
         }
 

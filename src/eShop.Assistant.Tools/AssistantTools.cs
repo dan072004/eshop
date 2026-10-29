@@ -16,6 +16,7 @@ public sealed partial class AssistantTools
 {
     private const int CatalogSearchPageSize = 8;
     private const int PolicySearchTop = 5;
+    private const string CatalogUnavailableMessage = "Error accessing catalog.";
 
     /// <summary>
     /// The citation rule travels with the tool, so any model that calls it (including MCP clients, which never see
@@ -93,39 +94,50 @@ public sealed partial class AssistantTools
     /// <summary>Every tool in the library, in contract order.</summary>
     public IReadOnlyList<AIFunction> All { get; }
 
-    private async Task<object> SearchPoliciesAsync(
+    private Task<object> SearchPoliciesAsync(
         [Description("The Buyer's question about an AdventureWorks Policy")] string question,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            return await _policy.SearchAsync(question, PolicySearchTop, cancellationToken);
-        }
-        catch (HttpRequestException e)
-        {
-            const string Message = "Error searching the Policies.";
-            _logger.LogError(e, Message);
-            return ToolError.Unavailable(Message);
-        }
-    }
+        CancellationToken cancellationToken) =>
+        GuardAsync(() => _policy.SearchAsync(question, PolicySearchTop, cancellationToken),
+            "Error searching the Policies.", cancellationToken);
 
-    private async Task<object> SearchCatalogAsync(
+    private Task<object> SearchCatalogAsync(
         [Description("The product description for which to search")] string productDescription,
-        CancellationToken cancellationToken)
-    {
-        try
+        CancellationToken cancellationToken) =>
+        GuardAsync(async () =>
         {
             var page = await _catalog.SearchBySemanticRelevanceAsync(productDescription, 0, CatalogSearchPageSize, cancellationToken);
             return page with
             {
                 Data = [.. page.Data.Select(item => item with { PictureUrl = _pictureUrl?.Invoke(item.Id) })]
             };
-        }
-        catch (HttpRequestException e)
+        }, CatalogUnavailableMessage, cancellationToken);
+
+    /// <summary>
+    /// The one error guard every tool call goes through: returns the call's result, or the <see cref="ToolError"/>
+    /// the model sees instead. <paramref name="knownError"/> maps the failures a backend gives a meaning to (e.g.
+    /// Ordering's 401 and 404); any other exception is logged and becomes <c>unavailable</c>. Only the caller's
+    /// own cancellation is rethrown.
+    /// </summary>
+    private async Task<object> GuardAsync<T>(
+        Func<Task<T>> call,
+        string unavailableMessage,
+        CancellationToken cancellationToken,
+        Func<Exception, ToolError?>? knownError = null)
+        where T : notnull
+    {
+        try
         {
-            const string Message = "Error accessing catalog.";
-            _logger.LogError(e, Message);
-            return ToolError.Unavailable(Message);
+            return await call();
+        }
+        catch (Exception e) when (e is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            if (knownError?.Invoke(e) is { } error)
+            {
+                return error;
+            }
+
+            _logger.LogError(e, "Tool call failed: {ToolErrorMessage}", unavailableMessage);
+            return ToolError.Unavailable(unavailableMessage);
         }
     }
 }
