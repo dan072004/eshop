@@ -7,9 +7,12 @@
         {
             return new List<ApiResource>
             {
-                new ApiResource("orders", "Orders Service"),
+                // Scopes ties the resource to its scope, so a token that requests "orders" names "orders" as an audience.
+                new ApiResource("orders", "Orders Service") { Scopes = { "orders" } },
                 new ApiResource("basket", "Basket Service"),
                 new ApiResource("webhooks", "Webhooks registration Service"),
+                // eShop.Mcp validates this audience (ADR 0005).
+                new ApiResource("eshop-mcp", "AdventureWorks MCP Server") { Scopes = { "eshop-mcp" } },
             };
         }
 
@@ -22,6 +25,7 @@
                 new ApiScope("orders", "Orders Service"),
                 new ApiScope("basket", "Basket Service"),
                 new ApiScope("webhooks", "Webhooks registration Service"),
+                new ApiScope("eshop-mcp", "AdventureWorks MCP Server: search the store and read your orders"),
             };
         }
 
@@ -39,6 +43,8 @@
         // client want to access resources (aka scopes)
         public static IEnumerable<Client> GetClients(IConfiguration configuration)
         {
+            var claudeCodeCallbackPort = configuration.GetRequiredValue("ClaudeCodeCallbackPort");
+
             return new List<Client>
             {
                 new Client
@@ -141,6 +147,24 @@
                     AccessTokenLifetime = 60*60*2, // 2 hours
                     IdentityTokenLifetime= 60*60*2 // 2 hours
                 },
+                // Local MCP clients sign in as the Buyer (ADR 0005). Client setup: README.md, "Connect Claude Code or VS Code".
+                McpClient(
+                    "claude-code",
+                    "Claude Code",
+                    [
+                        $"http://localhost:{claudeCodeCallbackPort}/callback",
+                        // Claude Code v2.1.229 sent the 127.0.0.1 form instead.
+                        $"http://127.0.0.1:{claudeCodeCallbackPort}/callback"
+                    ]),
+                McpClient(
+                    "vscode",
+                    "Visual Studio Code",
+                    [
+                        "http://127.0.0.1:33418",
+                        // VS Code's own client registration uses the trailing-slash form, and Duende matches exactly.
+                        "http://127.0.0.1:33418/",
+                        "https://vscode.dev/redirect"
+                    ]),
                 new Client
                 {
                     ClientId = "basketswaggerui",
@@ -188,5 +212,32 @@
                 }
             };
         }
+
+        // An MCP client (ADR 0005): public (no secret), authorization code with PKCE (S256), consent required and
+        // remembered, offline access with refresh-token rotation. The token names both eshop-mcp and orders as audiences.
+        private static Client McpClient(string clientId, string clientName, ICollection<string> redirectUris) => new()
+        {
+            ClientId = clientId,
+            ClientName = clientName,
+            AllowedGrantTypes = GrantTypes.Code,
+            RequireClientSecret = false,
+            RequirePkce = true,
+            AllowPlainTextPkce = false,
+            RedirectUris = redirectUris,
+            RequireConsent = true,
+            AllowRememberConsent = true,
+            AllowOfflineAccess = true,
+            RefreshTokenUsage = TokenUsage.OneTimeOnly,
+            AllowedScopes =
+            {
+                IdentityServerConstants.StandardScopes.OpenId,
+                IdentityServerConstants.StandardScopes.Profile,
+                IdentityServerConstants.StandardScopes.OfflineAccess,
+                "eshop-mcp",
+                "orders"
+            },
+            AccessTokenLifetime = 60 * 60 * 2, // 2 hours
+            IdentityTokenLifetime = 60 * 60 * 2 // 2 hours
+        };
     }
 }
