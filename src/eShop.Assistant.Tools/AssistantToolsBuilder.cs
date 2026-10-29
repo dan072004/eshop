@@ -1,4 +1,5 @@
 ﻿using eShop.Assistant.Tools.Catalog;
+using eShop.Assistant.Tools.Policy;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace eShop.Assistant.Tools;
@@ -7,12 +8,15 @@ namespace eShop.Assistant.Tools;
 /// Returned by <see cref="AssistantToolsServiceCollectionExtensions.AddAssistantTools"/> so the host can customise
 /// the typed clients (e.g. attach its own token <see cref="DelegatingHandler"/>) and supply host-specific functions.
 /// </summary>
-public sealed class AssistantToolsBuilder(IServiceCollection services, IHttpClientBuilder catalogClient)
+public sealed class AssistantToolsBuilder(IServiceCollection services, IHttpClientBuilder catalogClient, IHttpClientBuilder policyClient)
 {
     public IServiceCollection Services { get; } = services;
 
     /// <summary>The Catalog.API v2 client. It needs no token.</summary>
     public IHttpClientBuilder CatalogClient { get; } = catalogClient;
+
+    /// <summary>The policy-api client. Policies are public, so it needs no token.</summary>
+    public IHttpClientBuilder PolicyClient { get; } = policyClient;
 
     /// <summary>
     /// Supplies the function that turns a product id into a picture URL for <c>search_catalog</c> results.
@@ -36,8 +40,10 @@ public static class AssistantToolsServiceCollectionExtensions
         var catalogClient = services.AddHttpClient<CatalogClient>(client => client.BaseAddress = new(CatalogClient.BaseAddress))
             .AddApiVersion(2.0);
 
+        var policyClient = services.AddHttpClient<PolicyClient>(client => client.BaseAddress = new(PolicyClient.BaseAddress));
+
         services.AddTransient<AssistantTools>();
 
-        return new AssistantToolsBuilder(services, catalogClient);
+        return new AssistantToolsBuilder(services, catalogClient, policyClient);
     }
 }
