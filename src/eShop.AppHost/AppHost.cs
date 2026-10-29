@@ -76,7 +76,7 @@ var webApp = builder.AddDotnetProject("webapp", "../WebApp", o => o.LaunchProfil
     .WithReference(basketApi)
     .WithReference(catalogApi)
     .WithReference(orderingApi)
-    .WithReference(policyApi)
+    .WithPolicySearch(policyApi)
     .WithReference(rabbitMq).WaitFor(rabbitMq)
     .WaitFor(identityApi)
     .WithEnvironment("IdentityUrl", identityEndpoint);

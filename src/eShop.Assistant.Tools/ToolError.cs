@@ -7,4 +7,7 @@ public sealed record ToolError(string Error, string Message)
 {
     /// <summary>Any failure that isn't covered by a more specific error. The tool logs it.</summary>
     public static ToolError Unavailable(string message) => new("unavailable", message);
+
+    /// <summary>The backend needs the Buyer to sign in: no token was available, or it returned 401.</summary>
+    public static ToolError SignInRequired(string message) => new("sign_in_required", message);
 }

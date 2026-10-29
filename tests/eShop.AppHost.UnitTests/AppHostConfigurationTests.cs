@@ -70,6 +70,20 @@ public class AppHostConfigurationTests
     }
 
     [TestMethod]
+    public async Task WebAppReferencesPolicyApiByItsServiceName()
+    {
+        var builder = CreateBuilder();
+        var policyApi = builder.AddPolicyApi(builder.AddPostgres("postgres"), ProjectPath("Policy.API", "Policy.API.csproj"));
+        var webApp = builder.AddDotnetProject("webapp", ProjectPath("WebApp", "WebApp.csproj"));
+
+        webApp.WithPolicySearch(policyApi);
+
+        // The shared tools library's PolicyClient resolves https+http://policy-api through this service-discovery entry.
+        var environment = await EnvironmentOf(builder, webApp);
+        Assert.AreEqual("{policy-api.bindings.http.url}", environment["services__policy-api__http__0"]);
+    }
+
+    [TestMethod]
     [DataRow(null, DisplayName = "missing")]
     [DataRow("", DisplayName = "empty")]
     [DataRow("None")]

@@ -57,6 +57,14 @@ internal static class Extensions
     }
 
     /// <summary>
+    /// Lets a host of the shared assistant tools (WebApp's Shopping Assistant) call policy-api's anonymous search for
+    /// <c>search_policies</c>; the tools library addresses it by service name (<c>https+http://policy-api</c>).
+    /// </summary>
+    public static IResourceBuilder<DotnetProjectResource> WithPolicySearch(this IResourceBuilder<DotnetProjectResource> host,
+        IResourceBuilder<DotnetProjectResource> policyApi) =>
+        host.WithReference(policyApi);
+
+    /// <summary>
     /// Provisions the AI services chosen by the <c>ChatProvider</c> and <c>EmbeddingProvider</c> settings
     /// (each <c>None</c>, <c>Ollama</c> or <c>Foundry</c>, plus <c>Claude</c> for chat only; case-insensitive; default <c>None</c>).
     /// WebApp is told the chosen Chat Provider and gets its chat model, or for Claude the <c>anthropic-api-key</c> secret
