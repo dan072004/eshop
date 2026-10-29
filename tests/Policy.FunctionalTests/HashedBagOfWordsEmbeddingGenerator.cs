@@ -13,6 +13,11 @@ namespace eShop.Policy.FunctionalTests;
 /// <remarks>
 /// Its vectors are 768 long with the words in the first 384, like a real model that returns more
 /// dimensions than policy-api stores. It records every text it embeds, and its model id can be changed.
+/// <para>
+/// It fakes a boundary we don't own (ADR 0002), so it has no contract test against a real adapter: its vectors
+/// only need to be predictable, not to match a model's. The opt-in golden set (<see cref="GoldenSetTests"/>)
+/// checks search quality against the real embedding model.
+/// </para>
 /// </remarks>
 public sealed partial class HashedBagOfWordsEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>
 {

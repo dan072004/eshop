@@ -1,6 +1,4 @@
-﻿using System.Net.Http.Json;
-using System.Text;
-using System.Text.Json;
+﻿using System.Text;
 
 namespace eShop.Policy.FunctionalTests;
 
@@ -14,8 +12,6 @@ namespace eShop.Policy.FunctionalTests;
 /// </remarks>
 public sealed class GoldenSetTests(GoldenSetFixture fixture) : IClassFixture<GoldenSetFixture>
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     // Written from the Policy files before the first run, and not tuned to the model's answers.
     private static readonly (string Question, string Expected)[] Questions =
     [
@@ -50,8 +46,7 @@ public sealed class GoldenSetTests(GoldenSetFixture fixture) : IClassFixture<Gol
 
         foreach (var (question, expected) in Questions)
         {
-            var response = await client.GetFromJsonAsync<SearchResponse>(
-                $"/api/policies/search?q={Uri.EscapeDataString(question)}&top=5", JsonOptions, TestContext.Current.CancellationToken);
+            var response = await client.SearchPoliciesAsync(question, top: 5);
             Assert.Equal("semantic", response.Mode);
 
             var citations = response.Results.Select(r => r.Citation).ToList();
@@ -71,8 +66,4 @@ public sealed class GoldenSetTests(GoldenSetFixture fixture) : IClassFixture<Gol
 
         Assert.True(misses.Count == 0, $"{misses.Count} of {Questions.Length} questions missed:{Environment.NewLine}{string.Join(Environment.NewLine, misses)}");
     }
-
-    private sealed record SearchResponse(string Mode, List<SearchResult> Results);
-
-    private sealed record SearchResult(string Citation, double Score);
 }

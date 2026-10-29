@@ -35,11 +35,8 @@ public sealed class GoldenSetFixture : WebApplicationFactory<Program>, IAsyncLif
             return;
         }
 
-        var options = new DistributedApplicationOptions { AssemblyName = typeof(GoldenSetFixture).Assembly.FullName, DisableDashboard = true };
-        var appBuilder = DistributedApplication.CreateBuilder(options);
-        var postgres = appBuilder.AddPostgres("policydb")
-            .WithImage("ankane/pgvector")
-            .WithImageTag("latest");
+        var appBuilder = TestAppHost.CreateBuilder();
+        var postgres = appBuilder.AddPolicyPostgres();
         var embedding = appBuilder.AddOllama("ollama")
             .WithDataVolume()
             .AddModel("embedding", EmbeddingModel);
@@ -62,7 +59,7 @@ public sealed class GoldenSetFixture : WebApplicationFactory<Program>, IAsyncLif
         {
             config.AddInMemoryCollection(new Dictionary<string, string>
             {
-                { "ConnectionStrings:policydb", _postgresConnectionString },
+                { $"ConnectionStrings:{TestAppHost.PostgresName}", _postgresConnectionString },
                 { "ConnectionStrings:embedding", _embeddingConnectionString },
                 { "OllamaEnabled", "true" },
                 { "Policies:Folder", Path.Combine(FindRepositoryRoot(), "policies") },
@@ -76,15 +73,7 @@ public sealed class GoldenSetFixture : WebApplicationFactory<Program>, IAsyncLif
         await base.DisposeAsync();
         if (_app is not null)
         {
-            await _app.StopAsync();
-            if (_app is IAsyncDisposable asyncDisposable)
-            {
-                await asyncDisposable.DisposeAsync().ConfigureAwait(false);
-            }
-            else
-            {
-                _app.Dispose();
-            }
+            await TestAppHost.StopAndDisposeAsync(_app);
         }
     }
 
