@@ -81,6 +81,14 @@ var webApp = builder.AddDotnetProject("webapp", "../WebApp", o => o.LaunchProfil
     .WaitFor(identityApi)
     .WithEnvironment("IdentityUrl", identityEndpoint);
 
+// MCP server for local AI clients (Claude Code, VS Code). Buyers sign in through Identity.API (ADR 0005), so its
+// tokens must have the same issuer as the APIs'; it stays local, with fixed ports from its launch settings.
+var eshopMcp = builder.AddDotnetProject("eshop-mcp", "../eShop.Mcp", o => o.LaunchProfileName = launchProfileName)
+    .WithReference(catalogApi)
+    .WaitFor(identityApi)
+    .WithEnvironment("Identity__Url", identityEndpoint)
+    .WithHttpHealthCheck("/health");
+
 // Set ChatProvider (None, Ollama, Foundry or Claude) and EmbeddingProvider (None, Ollama or Foundry),
 // both default None, to switch on the Shopping Assistant and semantic catalog and Policy search.
 builder.AddChatAndEmbeddingProviders(catalogApi, webApp, policyApi);
@@ -94,7 +102,8 @@ identityApi.WithEnvironment("BasketApiClient", basketApi.GetEndpoint("http"))
            .WithEnvironment("OrderingApiClient", orderingApi.GetEndpoint("http"))
            .WithEnvironment("WebhooksApiClient", webHooksApi.GetEndpoint("http"))
            .WithEnvironment("WebhooksWebClient", webhooksClient.GetEndpoint(launchProfileName))
-           .WithEnvironment("WebAppClient", webApp.GetEndpoint(launchProfileName));
+           .WithEnvironment("WebAppClient", webApp.GetEndpoint(launchProfileName))
+           .WithEnvironment("EshopMcpClient", eshopMcp.GetEndpoint(launchProfileName));
 
 builder.Build().Run();
 
