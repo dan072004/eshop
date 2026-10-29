@@ -68,12 +68,13 @@ internal static class Extensions
     /// Provisions the AI services chosen by the <c>ChatProvider</c> and <c>EmbeddingProvider</c> settings
     /// (each <c>None</c>, <c>Ollama</c> or <c>Foundry</c>, plus <c>Claude</c> for chat only; case-insensitive; default <c>None</c>).
     /// WebApp is told the chosen Chat Provider and gets its chat model, or for Claude the <c>anthropic-api-key</c> secret
-    /// as <c>ANTHROPIC_API_KEY</c>; Catalog.API gets the embedding model.
+    /// as <c>ANTHROPIC_API_KEY</c>; Catalog.API and policy-api get the same embedding model.
     /// A provider chosen for both is created once.
     /// </summary>
     public static IDistributedApplicationBuilder AddChatAndEmbeddingProviders(this IDistributedApplicationBuilder builder,
         IResourceBuilder<DotnetProjectResource> catalogApi,
-        IResourceBuilder<DotnetProjectResource> webApp)
+        IResourceBuilder<DotnetProjectResource> webApp,
+        IResourceBuilder<DotnetProjectResource> policyApi)
     {
         var chatProvider = ParseSelector<ChatProvider>(builder.Configuration, "ChatProvider");
         var embeddingProvider = ParseSelector<EmbeddingProvider>(builder.Configuration, "EmbeddingProvider");
@@ -106,18 +107,25 @@ internal static class Extensions
                 break;
         }
 
-        // Catalog.API works out its embedding source from what it is given: OllamaEnabled, or a textEmbeddingModel connection string.
+        // Catalog.API and policy-api work out their embedding source from what they are given:
+        // OllamaEnabled, or a textEmbeddingModel connection string.
         switch (embeddingProvider)
         {
             case EmbeddingProvider.Foundry:
                 var embeddingDeployment = GetOrAddFoundry().AddDeployment("textEmbeddingModel", "text-embedding-3-small", "1", "OpenAI");
-                catalogApi.WithReference(embeddingDeployment).WaitFor(embeddingDeployment);
+                foreach (var consumer in new[] { catalogApi, policyApi })
+                {
+                    consumer.WithReference(embeddingDeployment).WaitFor(embeddingDeployment);
+                }
                 break;
             case EmbeddingProvider.Ollama:
                 var embeddingModel = GetOrAddOllama().AddModel("embedding", "all-minilm");
-                catalogApi.WithReference(embeddingModel)
-                    .WithEnvironment("OllamaEnabled", "true")
-                    .WaitFor(embeddingModel);
+                foreach (var consumer in new[] { catalogApi, policyApi })
+                {
+                    consumer.WithReference(embeddingModel)
+                        .WithEnvironment("OllamaEnabled", "true")
+                        .WaitFor(embeddingModel);
+                }
                 break;
         }
 

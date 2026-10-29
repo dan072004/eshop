@@ -16,6 +16,22 @@ public static class Extensions
 
         builder.Services.TryAddSingleton(TimeProvider.System);
 
+        // The embedding source is detected as Catalog.API does it, so the AppHost wires both the same way:
+        // OllamaEnabled with an "embedding" connection, or a "textEmbeddingModel" (Foundry) connection.
+        // With neither, there is no generator and Policy search runs in keyword mode.
+        if (builder.Configuration["OllamaEnabled"] is string ollamaEnabled && bool.Parse(ollamaEnabled))
+        {
+            builder.AddOllamaApiClient("embedding")
+                .AddEmbeddingGenerator();
+        }
+        else if (!string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("textEmbeddingModel")))
+        {
+            builder.AddOpenAIClientFromConfiguration("textEmbeddingModel")
+                .AddEmbeddingGenerator();
+        }
+
+        builder.Services.AddScoped<PolicyEmbeddings>();
+
         // Migrate, then index the Policy files, before the app starts serving.
         builder.Services.AddScoped<PolicyIngestion>();
         builder.Services.AddMigration<PolicyContext>((_, services) => services.GetRequiredService<PolicyIngestion>().IngestAsync());

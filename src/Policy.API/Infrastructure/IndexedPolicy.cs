@@ -18,7 +18,7 @@ public class IndexedPolicy
     /// <summary>SHA-256 of the file bytes, in hex.</summary>
     public required string ContentHash { get; set; }
 
-    /// <summary>The embedding model the Policy was indexed with, or <see cref="PolicyIngestion.NoEmbeddingModel"/>.</summary>
+    /// <summary>The embedding model the Policy was indexed with, or <see cref="Services.PolicyEmbeddings.NoEmbeddingModel"/>.</summary>
     public required string EmbeddingModelId { get; set; }
 
     public DateTimeOffset IndexedAt { get; set; }

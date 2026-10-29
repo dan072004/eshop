@@ -11,7 +11,7 @@ namespace eShop.Policy.FunctionalTests;
 /// policy-api against a real Postgres (with pgvector), reading its Policy files from a temporary folder
 /// that tests write to, edit and delete from before running ingestion again.
 /// </summary>
-public sealed class PolicyApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
+public class PolicyApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private readonly IHost _app;
     private string _postgresConnectionString;
@@ -53,7 +53,13 @@ public sealed class PolicyApiFixture : WebApplicationFactory<Program>, IAsyncLif
                 { "Policies:Folder", PoliciesFolder },
             });
         });
+        builder.ConfigureServices(ConfigureTestServices);
         return base.CreateHost(builder);
+    }
+
+    /// <summary>Replaces services after the app has registered its own; with none replaced, there is no embedding generator.</summary>
+    protected virtual void ConfigureTestServices(IServiceCollection services)
+    {
     }
 
     public async ValueTask InitializeAsync()

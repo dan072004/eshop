@@ -243,9 +243,35 @@ public class AppHostConfigurationTests
     }
 
     [TestMethod]
+    [DataRow(null, null, null, null, DisplayName = "missing")]
+    [DataRow("None", null, null, null)]
+    [DataRow("Ollama", "ollama", "embedding", "true")]
+    [DataRow("ollama", "ollama", "embedding", "true")]
+    [DataRow("Foundry", "foundry", "textEmbeddingModel", null)]
+    public async Task PolicyApiGetsTheSameEmbeddingWiringAsCatalog(
+        string? embeddingProvider, string? providerResource, string? embeddingResource, string? expectedOllamaEnabled)
+    {
+        var app = CreateAppModel(chatProvider: null, embeddingProvider: embeddingProvider);
+
+        var catalogWiring = EmbeddingWiring(await EnvironmentOf(app, app.Catalog));
+        var policyWiring = EmbeddingWiring(await EnvironmentOf(app, app.PolicyApi));
+
+        Assert.AreEqual(expectedOllamaEnabled, policyWiring.GetValueOrDefault("OllamaEnabled"));
+        Assert.AreEqual(
+            embeddingResource is null ? null : $"{{{embeddingResource}.connectionString}}",
+            policyWiring.GetValueOrDefault($"ConnectionStrings__{embeddingResource}"));
+        CollectionAssert.AreEquivalent(catalogWiring, policyWiring);
+
+        string[] expectedWaits = providerResource is null ? [] : [providerResource, embeddingResource!];
+        CollectionAssert.AreEquivalent(expectedWaits, AIResourcesWaitedFor(app.Catalog));
+        CollectionAssert.AreEquivalent(expectedWaits, AIResourcesWaitedFor(app.PolicyApi));
+    }
+
+
+    [TestMethod]
     [DataRow("Foundry", "foundry", "chatModel", "textEmbeddingModel")]
     [DataRow("Ollama", "ollama", "chat", "embedding")]
-    public void ProviderUsedForChatAndEmbeddingsIsCreatedOnce(
+    public async Task ProviderUsedForChatAndEmbeddingsIsCreatedOnceAndSharedByCatalogAndPolicyApi(
         string provider, string providerResource, string chatResource, string embeddingResource)
     {
         var app = CreateAppModel(chatProvider: provider, embeddingProvider: provider);
@@ -253,6 +279,9 @@ public class AppHostConfigurationTests
         CollectionAssert.AreEquivalent(
             new[] { providerResource, chatResource, embeddingResource },
             app.AddedResources);
+        var policyEnvironment = await EnvironmentOf(app, app.PolicyApi);
+        Assert.AreEqual($"{{{embeddingResource}.connectionString}}", policyEnvironment[$"ConnectionStrings__{embeddingResource}"]);
+        Assert.IsFalse(policyEnvironment.ContainsKey($"ConnectionStrings__{chatResource}"));
     }
 
     [TestMethod]
@@ -275,7 +304,8 @@ public class AppHostConfigurationTests
         IDistributedApplicationBuilder Builder,
         string[] AddedResources,
         IResourceBuilder<DotnetProjectResource> Catalog,
-        IResourceBuilder<DotnetProjectResource> WebApp);
+        IResourceBuilder<DotnetProjectResource> WebApp,
+        IResourceBuilder<DotnetProjectResource> PolicyApi);
 
     private static AppModel CreateAppModel(string? chatProvider, string? embeddingProvider)
     {
@@ -287,18 +317,32 @@ public class AppHostConfigurationTests
         });
         var catalog = builder.AddDotnetProject("catalog-api", ProjectPath("Catalog.API", "Catalog.API.csproj"));
         var webApp = builder.AddDotnetProject("webapp", ProjectPath("WebApp", "WebApp.csproj"));
+        var policyApi = builder.AddDotnetProject("policy-api", ProjectPath("Policy.API", "Policy.API.csproj"));
 
         var resourcesBefore = ResourceNames(builder);
 
-        builder.AddChatAndEmbeddingProviders(catalog, webApp);
+        builder.AddChatAndEmbeddingProviders(catalog, webApp, policyApi);
 
         // The Azure environment and Open WebUI come with the Foundry and Ollama integrations; we assert on the resources we choose.
         var added = ResourceNames(builder).Except(resourcesBefore).Except(["azure-environment", "ollama-openwebui"]).ToArray();
-        return new AppModel(builder, added, catalog, webApp);
+        return new AppModel(builder, added, catalog, webApp, policyApi);
     }
 
     private static string[] ResourceNames(IDistributedApplicationBuilder builder) =>
         builder.Resources.Select(resource => resource.Name).ToArray();
+
+    // Everything a project is given except what every project gets from its own launch profile.
+    private static Dictionary<string, string> EmbeddingWiring(Dictionary<string, string> environment) =>
+        environment
+            .Where(e => e.Key is not ("ASPNETCORE_URLS" or "DOTNET_LAUNCH_PROFILE" or "ASPNETCORE_ENVIRONMENT")
+                && !e.Key.StartsWith("OTEL_", StringComparison.Ordinal))
+            .ToDictionary();
+
+    private static string[] AIResourcesWaitedFor(IResourceBuilder<DotnetProjectResource> project) =>
+        project.Resource.Annotations.OfType<WaitAnnotation>()
+            .Select(wait => wait.Resource.Name)
+            .Where(name => name != "__dotnet-project-build")
+            .ToArray();
 
     private static bool HasConnectionString(Dictionary<string, string> environment) =>
         environment.Keys.Any(key => key.StartsWith("ConnectionStrings__", StringComparison.Ordinal));

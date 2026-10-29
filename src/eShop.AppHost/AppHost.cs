@@ -82,8 +82,8 @@ var webApp = builder.AddDotnetProject("webapp", "../WebApp", o => o.LaunchProfil
     .WithEnvironment("IdentityUrl", identityEndpoint);
 
 // Set ChatProvider (None, Ollama, Foundry or Claude) and EmbeddingProvider (None, Ollama or Foundry),
-// both default None, to switch on the Shopping Assistant and semantic catalog search.
-builder.AddChatAndEmbeddingProviders(catalogApi, webApp);
+// both default None, to switch on the Shopping Assistant and semantic catalog and Policy search.
+builder.AddChatAndEmbeddingProviders(catalogApi, webApp, policyApi);
 
 // Wire up the callback urls (self referencing)
 webApp.WithEnvironment("CallBackUrl", webApp.GetEndpoint(launchProfileName));
