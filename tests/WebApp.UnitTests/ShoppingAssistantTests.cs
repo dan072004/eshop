@@ -13,7 +13,7 @@ public class ShoppingAssistantTests
     public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    public async Task OffersSearchPoliciesAlongsideItsOtherTools()
+    public async Task OffersThePolicyAndOrderToolsAlongsideItsOtherTools()
     {
         var chatClient = new RecordingChatClient();
         var chat = CreateChat(chatClient);
@@ -22,7 +22,7 @@ public class ShoppingAssistantTests
 
         var toolNames = chatClient.Options!.Tools!.Select(tool => tool.Name).ToArray();
         CollectionAssert.IsSubsetOf(
-            new[] { "search_policies", "search_catalog", "GetUserInfo", "AddToCart", "GetCartContents" },
+            new[] { "search_policies", "list_my_orders", "get_order", "search_catalog", "GetUserInfo", "AddToCart", "GetCartContents" },
             toolNames);
     }
 

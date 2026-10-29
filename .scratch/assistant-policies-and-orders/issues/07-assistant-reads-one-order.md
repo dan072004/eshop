@@ -11,11 +11,19 @@
 
 **Status:** ready-for-agent
 
-- [ ] Fast tests at the `AIFunction` seam (fake outbound `HttpMessageHandler`):
-  - [ ] Items carry the `type` and `brand` that Catalog returned
-  - [ ] A product Catalog doesn't know yields `null` type and brand
-  - [ ] 404 → `not_found`; 401 → `sign_in_required`; 500 → `unavailable`
-  - [ ] `today` is present, and the tool has the contract's name and parameter name
-- [ ] The Shopping Assistant offers `get_order`
+- [x] Fast tests at the `AIFunction` seam (fake outbound `HttpMessageHandler`):
+  - [x] Items carry the `type` and `brand` that Catalog returned
+  - [x] A product Catalog doesn't know yields `null` type and brand
+  - [x] 404 → `not_found`; 401 → `sign_in_required`; 500 → `unavailable`
+  - [x] `today` is present, and the tool has the contract's name and parameter name
+- [x] The Shopping Assistant offers `get_order`
 - [ ] Manual: "what was in my last order?" lists the items with their types
 - [ ] Manual: asking about one of bob's order numbers while signed in as alice is answered as not found
+
+## Comments
+
+- Type and brand: one call to Catalog.API `items/by?ids=...` (it returns `catalogTypeId`/`catalogBrandId` without names) plus `catalogtypes` and `catalogbrands`, in parallel; no Catalog.API change. New `CatalogClient` methods: `GetItemsByIdsAsync`, `GetTypesAsync`, `GetBrandsAsync`.
+- A product Catalog doesn't know gets `type: null, brand: null`, written explicitly (`JsonIgnoreCondition.Never`): the AI serializer otherwise drops nulls.
+- Decision: if Catalog itself fails (non-2xx, unreachable), `get_order` returns `unavailable` ("Error accessing catalog."), not null types, so the model can't apply the default Return Window to a Navigation item by mistake.
+- Added `ToolError.NotFound` (`not_found`); `OrderingError` maps 404 to it for every order tool. `OrderingClient.GetOrderAsync(orderNumber, ct)` returns `OrderingOrder`.
+- `AssistantTools.All` now matches the contract order: `search_policies, list_my_orders, get_order, search_catalog`. `ShoppingAssistantTests` now also expects `list_my_orders` (06 hadn't added it).

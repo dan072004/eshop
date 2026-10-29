@@ -67,7 +67,15 @@ public sealed partial class AssistantTools
                 + "Each order has its order number, Order Date, status and total.",
         });
 
-        All = [SearchPolicies, ListMyOrders, SearchCatalog];
+        GetOrder = AIFunctionFactory.Create(GetOrderAsync, new AIFunctionFactoryOptions
+        {
+            Name = AssistantToolNames.GetOrder,
+            Description = "Gets one of the signed-in Buyer's own AdventureWorks orders by its order number, with today's date (UTC). "
+                + "It has the Order Date, status and items; each item has its product id and name, units, unit price, "
+                + "and its catalog type and brand (null when the catalog doesn't know the product).",
+        });
+
+        All = [SearchPolicies, ListMyOrders, GetOrder, SearchCatalog];
     }
 
     /// <summary><c>search_policies(question)</c>.</summary>
@@ -75,6 +83,9 @@ public sealed partial class AssistantTools
 
     /// <summary><c>list_my_orders()</c>.</summary>
     public AIFunction ListMyOrders { get; }
+
+    /// <summary><c>get_order(orderNumber)</c>.</summary>
+    public AIFunction GetOrder { get; }
 
     /// <summary><c>search_catalog(productDescription)</c>.</summary>
     public AIFunction SearchCatalog { get; }
