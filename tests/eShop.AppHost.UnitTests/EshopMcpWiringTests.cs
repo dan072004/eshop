@@ -18,13 +18,15 @@ public class EshopMcpWiringTests
 
     [TestMethod]
     [DoNotParallelize]
-    public async Task EshopMcpReferencesCatalogAndWaitsForIdentityWithTheUrlTheApisGet()
+    public async Task EshopMcpReferencesTheToolBackendsAndWaitsForIdentityWithTheUrlTheApisGet()
     {
         await using var appHost = await CreateAppHostAsync(useHttpEndpoints: false);
         var mcp = Resource(appHost, "eshop-mcp");
 
         var environment = await EnvironmentOf(appHost, mcp);
+        Assert.AreEqual("{policy-api.bindings.http.url}", environment["services__policy-api__http__0"]);
         Assert.AreEqual("{catalog-api.bindings.http.url}", environment["services__catalog-api__http__0"]);
+        Assert.AreEqual("{ordering-api.bindings.http.url}", environment["services__ordering-api__http__0"]);
 
         // Tokens carry the issuer Identity.API was reached on, so eShop.Mcp must use the URL Ordering.API validates.
         var orderingEnvironment = await EnvironmentOf(appHost, Resource(appHost, "ordering-api"));

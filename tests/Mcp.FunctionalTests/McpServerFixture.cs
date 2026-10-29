@@ -3,6 +3,8 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using eShop.Assistant.Tools.Catalog;
+using eShop.Assistant.Tools.Ordering;
+using eShop.Assistant.Tools.Policy;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -16,21 +18,30 @@ namespace eShop.Mcp.FunctionalTests;
 
 /// <summary>
 /// eShop.Mcp in a <see cref="WebApplicationFactory{TEntryPoint}"/>. Identity.API is not started: JWT validation trusts
-/// a test signing key and tests mint their own Buyer tokens. The outbound handler behind the Catalog client is faked.
+/// a test signing key and tests mint their own Buyer tokens. The outbound handlers behind the policy-api, Catalog and
+/// Ordering clients are faked.
 /// </summary>
 public sealed class McpServerFixture : WebApplicationFactory<Program>
 {
     public const string IdentityUrl = "http://identity.test";
+    public const string PolicyUrl = "http://policy.test";
     public const string CatalogUrl = "http://catalog.test";
+    public const string OrderingUrl = "http://ordering.test";
 
     private readonly RsaSecurityKey _signingKey = new(RSA.Create(2048)) { KeyId = "test-key" };
 
+    public RecordingHandler Policy { get; } = new();
+
     public RecordingHandler Catalog { get; } = new();
+
+    public RecordingHandler Ordering { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("Identity:Url", IdentityUrl);
+        builder.UseSetting("services:policy-api:http:0", PolicyUrl);
         builder.UseSetting("services:catalog-api:http:0", CatalogUrl);
+        builder.UseSetting("services:ordering-api:http:0", OrderingUrl);
 
         builder.ConfigureTestServices(services =>
         {
@@ -43,7 +54,9 @@ public sealed class McpServerFixture : WebApplicationFactory<Program>
                 options.Configuration = configuration;
             });
 
+            services.AddHttpClient<PolicyClient>().ConfigurePrimaryHttpMessageHandler(() => Policy);
             services.AddHttpClient<CatalogClient>().ConfigurePrimaryHttpMessageHandler(() => Catalog);
+            services.AddHttpClient<OrderingClient>().ConfigurePrimaryHttpMessageHandler(() => Ordering);
         });
     }
 

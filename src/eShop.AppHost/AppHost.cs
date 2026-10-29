@@ -84,7 +84,9 @@ var webApp = builder.AddDotnetProject("webapp", "../WebApp", o => o.LaunchProfil
 // MCP server for local AI clients (Claude Code, VS Code). Buyers sign in through Identity.API (ADR 0005), so its
 // tokens must have the same issuer as the APIs'; it stays local, with fixed ports from its launch settings.
 var eshopMcp = builder.AddDotnetProject("eshop-mcp", "../eShop.Mcp", o => o.LaunchProfileName = launchProfileName)
+    .WithReference(policyApi)
     .WithReference(catalogApi)
+    .WithReference(orderingApi)
     .WaitFor(identityApi)
     .WithEnvironment("Identity__Url", identityEndpoint)
     .WithHttpHealthCheck("/health");

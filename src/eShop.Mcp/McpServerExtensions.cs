@@ -71,7 +71,9 @@ internal static class McpServerExtensions
     /// </summary>
     public static IHostApplicationBuilder AddMcpServer(this IHostApplicationBuilder builder)
     {
-        builder.Services.AddAssistantTools();
+        // Only Ordering needs the Buyer: it gets the caller's own validated token, read back from this request.
+        // The policy and catalog clients send no token. Ordering.API keeps the ownership check.
+        builder.Services.AddAssistantTools().OrderingClient.AddAuthToken();
 
         builder.Services.AddMcpServer()
             .WithHttpTransport(options =>
@@ -82,7 +84,7 @@ internal static class McpServerExtensions
                 options.ConfigureSessionOptions = (httpContext, serverOptions, _) =>
                 {
                     var tools = httpContext.RequestServices.GetRequiredService<AssistantTools>();
-                    serverOptions.ToolCollection = [McpServerTool.Create(tools.SearchCatalog)];
+                    serverOptions.ToolCollection = [.. tools.All.Select(tool => McpServerTool.Create(tool))];
                     return Task.CompletedTask;
                 };
             });
