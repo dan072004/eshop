@@ -42,6 +42,21 @@ internal static class Extensions
     }
 
     /// <summary>
+    /// Adds <c>policy-api</c> with its own <c>policydb</c> database on the shared Postgres server (ADR 0004).
+    /// It waits for the database because it migrates and indexes the Policy files at startup.
+    /// </summary>
+    public static IResourceBuilder<DotnetProjectResource> AddPolicyApi(this IDistributedApplicationBuilder builder,
+        IResourceBuilder<PostgresServerResource> postgres,
+        string projectPath = "../Policy.API")
+    {
+        var policyDb = postgres.AddDatabase("policydb");
+
+        return builder.AddDotnetProject("policy-api", projectPath)
+            .WithReference(policyDb).WaitFor(policyDb)
+            .WithHttpHealthCheck("/health");
+    }
+
+    /// <summary>
     /// Provisions the AI services chosen by the <c>ChatProvider</c> and <c>EmbeddingProvider</c> settings
     /// (each <c>None</c>, <c>Ollama</c> or <c>Foundry</c>, plus <c>Claude</c> for chat only; case-insensitive; default <c>None</c>).
     /// WebApp is told the chosen Chat Provider and gets its chat model, or for Claude the <c>anthropic-api-key</c> secret
