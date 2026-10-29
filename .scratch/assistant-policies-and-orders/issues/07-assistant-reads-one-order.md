@@ -9,7 +9,7 @@
 
 **Blocked by:** 06 (Shopping Assistant lists the Buyer's orders)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Fast tests at the `AIFunction` seam (fake outbound `HttpMessageHandler`):
   - [x] Items carry the `type` and `brand` that Catalog returned

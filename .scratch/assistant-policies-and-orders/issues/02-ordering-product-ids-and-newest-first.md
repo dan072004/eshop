@@ -8,7 +8,7 @@ Endpoints, their ownership checks and their 404-for-not-yours behaviour stay unc
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] The order detail response includes `productId` for every item
 - [x] The Buyer's order list is sorted newest-first, ties by order number descending

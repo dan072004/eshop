@@ -8,7 +8,7 @@
 
 **Blocked by:** 01 (shared tools library), 03 (policy-api with keyword Policy search)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] `search_policies` is in the library with the contract's name, parameter name and description
 - [x] Fast tests at the `AIFunction` seam (fake outbound `HttpMessageHandler`): `citation` and `mode` are passed through as returned; a failure from policy-api becomes the `unavailable` error result

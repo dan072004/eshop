@@ -11,7 +11,7 @@ If the basket client turns out to have the same token problem, raise it as its o
 
 **Blocked by:** 01 (shared tools library), 02 (Ordering newest-first)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] Fast tests in `WebApp.UnitTests`: holder filled → the outbound request carries `Authorization: Bearer <token>`; holder empty → no header. Only the inner handler is faked
 - [x] Fast tests at the `AIFunction` seam (fake outbound `HttpMessageHandler`): orders and `today` are returned as Ordering sent them; 401 → `sign_in_required`; 500 → `unavailable`; the contract's name, with no parameters

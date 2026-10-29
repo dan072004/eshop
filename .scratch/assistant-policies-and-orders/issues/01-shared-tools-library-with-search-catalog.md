@@ -12,7 +12,7 @@ See the spec's "Shared tools library" section.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] The library and its unit test project exist, are in `eShop.Web.slnf`, and build with warnings as errors
 - [x] `search_catalog(productDescription)` lives in the library with the same behaviour and result as the old catalog search tool

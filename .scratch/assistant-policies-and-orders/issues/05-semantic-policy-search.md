@@ -9,7 +9,7 @@
 
 **Blocked by:** 03 (policy-api with keyword Policy search)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] `Policy.FunctionalTests` replaces `IEmbeddingGenerator` (a boundary we don't own) with a deterministic fake, such as hashed bag-of-words vectors:
   - [x] Search returns the expected section first, with `mode` = `semantic`

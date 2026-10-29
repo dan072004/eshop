@@ -15,7 +15,7 @@ See the spec's "policy-api" section for the full schema and rules.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] `policy-api` and `policydb` appear in the Aspire dashboard, healthy, with ingestion logged at startup
 - [x] Plain fast tests (new policy-api unit test project, MSTest.Sdk) cover front matter, a missing title, an intro section, an empty intro, `###` and tables kept in place, a Policy with no `##`, and anchors
