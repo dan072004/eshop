@@ -14,6 +14,7 @@
     <ProjectReference Include="..\eShop.ServiceDefaults\eShop.ServiceDefaults.csproj" />
     <ProjectReference Include="..\EventBusRabbitMQ\EventBusRabbitMQ.csproj" />
     <ProjectReference Include="..\WebAppComponents\WebAppComponents.csproj" />
+    <ProjectReference Include="..\eShop.Assistant.Tools\eShop.Assistant.Tools.csproj" />
   </ItemGroup>
 
   <ItemGroup>
