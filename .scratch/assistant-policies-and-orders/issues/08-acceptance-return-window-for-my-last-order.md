@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 (Policy questions with Citations), 05 (semantic Policy search), 07 (reads one order)
 
-**Status:** ready-for-human
+**Status:** done
 
 - [x] `aspire run` with `ChatProvider=Claude` and `EmbeddingProvider=Ollama`
 - [x] Signed in as alice, place an order with a Navigation item and a non-navigation item
