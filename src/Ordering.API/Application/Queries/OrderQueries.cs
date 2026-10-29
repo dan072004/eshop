@@ -8,7 +8,7 @@ public class OrderQueries(OrderingContext context)
         var order = await context.Orders
             .Include(o => o.OrderItems)
             .FirstOrDefaultAsync(o => o.Id == id);
-      
+
         if (order is null)
             throw new KeyNotFoundException();
 
@@ -26,6 +26,7 @@ public class OrderQueries(OrderingContext context)
             Total = order.GetTotal(),
             OrderItems = order.OrderItems.Select(oi => new Orderitem
             {
+                ProductId = oi.ProductId,
                 ProductName = oi.ProductName,
                 Units = oi.Units,
                 UnitPrice = (double)oi.UnitPrice,
@@ -37,13 +38,15 @@ public class OrderQueries(OrderingContext context)
     public async Task<IEnumerable<OrderSummary>> GetOrdersFromUserAsync(string userId)
     {
         return await context.Orders
-            .Where(o => o.Buyer.IdentityGuid == userId)  
+            .Where(o => o.Buyer.IdentityGuid == userId)
+            .OrderByDescending(o => o.OrderDate)
+            .ThenByDescending(o => o.Id)
             .Select(o => new OrderSummary
             {
                 OrderNumber = o.Id,
                 Date = o.OrderDate,
                 Status = o.OrderStatus.ToString(),
-                Total =(double) o.OrderItems.Sum(oi => oi.UnitPrice* oi.Units)
+                Total = (double)o.OrderItems.Sum(oi => oi.UnitPrice * oi.Units)
             })
             .ToListAsync();
     }
@@ -54,6 +57,6 @@ public class OrderQueries(OrderingContext context)
             .AnyAsync(o => o.Id == orderId && o.Buyer.IdentityGuid == userId);
     }
 
-    public async Task<IEnumerable<CardType>> GetCardTypesAsync() => 
-        await context.CardTypes.Select(c=> new CardType { Id = c.Id, Name = c.Name }).ToListAsync();
+    public async Task<IEnumerable<CardType>> GetCardTypesAsync() =>
+        await context.CardTypes.Select(c => new CardType { Id = c.Id, Name = c.Name }).ToListAsync();
 }
