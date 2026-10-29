@@ -137,7 +137,7 @@ public class GetOrderToolTests
     }
 
     [TestMethod]
-    public void GetOrderHasTheContractNameAndParameterName()
+    public void GetOrderHasTheContractNameParameterNameAndSearchByTypeRule()
     {
         var tools = BuildTools(new FakeHandler(_ => Json(HttpStatusCode.OK, OrderDetailsJson)), CatalogHandler(CatalogItems));
         var tool = tools.GetOrder;
@@ -146,6 +146,12 @@ public class GetOrderToolTests
         var properties = tool.JsonSchema.GetProperty("properties").EnumerateObject().ToList();
         Assert.AreEqual("orderNumber", properties.Single().Name);
         Assert.AreEqual("integer", properties.Single().Value.GetProperty("type").GetString());
+        Assert.AreEqual(
+            "Gets one of the signed-in Buyer's own AdventureWorks orders by its order number, with today's date (UTC). " +
+            "It has the Order Date, status and items; each item has its product id and name, units, unit price, " +
+            "and its catalog type and brand (null when the catalog doesn't know the product). " +
+            "Some Policy rules, such as Return Windows, depend on an item's type: name the types when searching the Policies.",
+            tool.Description);
         CollectionAssert.AreEqual(
             new[] { "search_policies", "list_my_orders", "get_order", "search_catalog" },
             tools.All.Select(t => t.Name).ToArray());

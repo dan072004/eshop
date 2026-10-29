@@ -73,13 +73,18 @@ public class ListMyOrdersToolTests
     }
 
     [TestMethod]
-    public void ListMyOrdersHasTheContractNameAndNoParameters()
+    public void ListMyOrdersHasTheContractNameNoParametersAndPointsToGetOrder()
     {
         var tools = BuildTools(new FakeHandler(_ => Json(HttpStatusCode.OK, "[]")));
         var tool = tools.ListMyOrders;
 
         Assert.AreEqual("list_my_orders", tool.Name);
         Assert.IsFalse(tool.JsonSchema.TryGetProperty("properties", out var properties) && properties.EnumerateObject().Any());
+        Assert.AreEqual(
+            "Lists the signed-in Buyer's own AdventureWorks orders, newest first, with today's date (UTC). " +
+            "Each order has its order number, Order Date, status and total, but no items; " +
+            "call get_order for an order's items.",
+            tool.Description);
         CollectionAssert.Contains(tools.All.ToList(), tool);
     }
 

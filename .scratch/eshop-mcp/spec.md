@@ -74,6 +74,7 @@ For "what's the return window for my last order?" in Claude Code, on a shipped o
   - Results are returned as the JSON text the library produces, with no `outputSchema` and no `structuredContent`.
   - Error results stay tool output, as the contract defines: `not_found`, `sign_in_required`, `unavailable`.
   - `get_order`: a product Catalog.API doesn't know gets `null` `type` and `brand`; a Catalog.API failure returns `unavailable` for the whole call, so no Return Window is given without item types.
+  - **Descriptions (contract change from assistant ticket 08, already written into the other spec).** `list_my_orders` says it has no items and points to `get_order`. `get_order` tells the model to name the item types when searching the Policies. Without that, the model gave the standard Return Window to a Navigation item.
 - **Catalog picture URLs (contract change, already written into the other spec).** The library lets the host supply a product-id → image URL function. eShop.Mcp supplies none, so `pictureUrl` is left out of its catalog results.
 - **Authentication.**
   - JWT bearer authentication against Identity.API, configured by eShop.Mcp itself rather than through the shared `AddDefaultAuthentication`, because it must **validate the audience** (`eshop-mcp`). The shared default turns audience validation off.

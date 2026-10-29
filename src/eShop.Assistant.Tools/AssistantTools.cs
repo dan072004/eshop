@@ -27,6 +27,25 @@ public sealed partial class AssistantTools
         "State Policy rules only from these results; cite each rule with its citation value; " +
         "if no result answers the question, say so.";
 
+    /// <summary>
+    /// Points the model at <c>get_order</c>: without it, a model that only lists orders never sees the item types
+    /// that decide the Return Window, and answers with the standard one.
+    /// </summary>
+    public const string ListMyOrdersDescription =
+        "Lists the signed-in Buyer's own AdventureWorks orders, newest first, with today's date (UTC). " +
+        "Each order has its order number, Order Date, status and total, but no items; " +
+        "call get_order for an order's items.";
+
+    /// <summary>
+    /// Tells the model to search with the item types, so a search can find the Policy Sections for those types
+    /// (e.g. the Navigation Return Window) and not only the standard rule.
+    /// </summary>
+    public const string GetOrderDescription =
+        "Gets one of the signed-in Buyer's own AdventureWorks orders by its order number, with today's date (UTC). " +
+        "It has the Order Date, status and items; each item has its product id and name, units, unit price, " +
+        "and its catalog type and brand (null when the catalog doesn't know the product). " +
+        "Some Policy rules, such as Return Windows, depend on an item's type: name the types when searching the Policies.";
+
     private readonly CatalogClient _catalog;
     private readonly PolicyClient _policy;
     private readonly OrderingClient _ordering;
@@ -64,16 +83,13 @@ public sealed partial class AssistantTools
         ListMyOrders = AIFunctionFactory.Create(ListMyOrdersAsync, new AIFunctionFactoryOptions
         {
             Name = AssistantToolNames.ListMyOrders,
-            Description = "Lists the signed-in Buyer's own AdventureWorks orders, newest first, with today's date (UTC). "
-                + "Each order has its order number, Order Date, status and total.",
+            Description = ListMyOrdersDescription,
         });
 
         GetOrder = AIFunctionFactory.Create(GetOrderAsync, new AIFunctionFactoryOptions
         {
             Name = AssistantToolNames.GetOrder,
-            Description = "Gets one of the signed-in Buyer's own AdventureWorks orders by its order number, with today's date (UTC). "
-                + "It has the Order Date, status and items; each item has its product id and name, units, unit price, "
-                + "and its catalog type and brand (null when the catalog doesn't know the product).",
+            Description = GetOrderDescription,
         });
 
         All = [SearchPolicies, ListMyOrders, GetOrder, SearchCatalog];

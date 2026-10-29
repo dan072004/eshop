@@ -126,8 +126,10 @@ For "what's the return window for my last order?" on a shipped order containing 
     - Description: AdventureWorks Policies on returns, exchanges, shipping, warranty, sizing, payments and orders. State Policy rules only from these results; cite each rule with its `citation` value; if no result answers the question, say so.
   - `list_my_orders()`
     - Returns `{ today, orders: [ { orderNumber, orderDate, status, total } ] }`, newest-first, as Ordering returns them.
+    - Description ends: …but no items; call get_order for an order's items. (Contract change from acceptance ticket 08: with only the list, the model gave the standard 60-day Return Window to a Navigation item.)
   - `get_order(orderNumber: int)`
     - Returns `{ today, orderNumber, orderDate, status, items: [ { productId, productName, units, unitPrice, type, brand } ] }`.
+    - Description ends: Some Policy rules, such as Return Windows, depend on an item's type: name the types when searching the Policies. (Same change: a search for just "return window" doesn't rank Returns Exceptions.)
     - `type` and `brand` come from Catalog.API by `productId`. If an item can't be found in the catalog, they are `null`; the tool doesn't fail.
     - If Catalog.API itself fails, the whole call returns `unavailable` rather than items with `null` types, so the model never gives a Return Window without the item types it depends on.
   - `search_catalog(productDescription: string)`
