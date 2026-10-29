@@ -11,7 +11,7 @@ See the eshop-mcp spec's "eShop.Mcp" and "AppHost" sections.
 
 **Blocked by:** assistant-policies-and-orders 01 (shared tools library, starting with `search_catalog`)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] New `Mcp.FunctionalTests` (xUnit v3, eShop.Mcp in a `WebApplicationFactory`). It uses the real MCP SDK client, JWT validation trusting a test signing key with tokens minted per test, and a faked outbound `HttpMessageHandler`:
   - [ ] No token → 401, and `WWW-Authenticate` carries `resource_metadata`. The metadata's `resource` is the server URL, and `authorization_servers` is exactly the configured Identity URL

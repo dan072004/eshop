@@ -17,7 +17,7 @@ This is where two unverified assumptions get proven: that Duende's exact redirec
 
 **Blocked by:** 01 (eShop.Mcp serves `search_catalog`)
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 - [ ] The `eshop-mcp` scope and the two clients are added through configuration next to the existing clients, with the existing clients unchanged
 - [ ] Manual: from Claude Code, the documented command opens the Identity.API login. Signing in as alice and approving consent succeeds, and a catalog search returns products

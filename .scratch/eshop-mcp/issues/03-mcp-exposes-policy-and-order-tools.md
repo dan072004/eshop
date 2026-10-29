@@ -9,7 +9,7 @@
 
 **Blocked by:** 01 (eShop.Mcp serves `search_catalog`), assistant-policies-and-orders 04 (`search_policies` in the library), assistant-policies-and-orders 07 (`get_order` in the library)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] `Mcp.FunctionalTests`:
   - [ ] `tools/list` returns exactly `search_policies`, `search_catalog`, `list_my_orders` and `get_order`, with the contract's parameter names
