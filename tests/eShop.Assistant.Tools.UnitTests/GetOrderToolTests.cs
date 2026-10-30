@@ -62,24 +62,19 @@ public class GetOrderToolTests
         Assert.AreEqual("/api/orders/12", request.RequestUri.AbsolutePath);
         Assert.AreEqual("1.0", System.Web.HttpUtility.ParseQueryString(request.RequestUri.Query)["api-version"]);
 
-        Assert.AreEqual("2026-10-29", result.GetProperty("today").GetString());
-        Assert.AreEqual(12, result.GetProperty("orderNumber").GetInt32());
-        Assert.AreEqual("2026-10-27T15:04:05Z", result.GetProperty("orderDate").GetString());
-        Assert.AreEqual("Shipped", result.GetProperty("status").GetString());
-
-        var items = result.GetProperty("items").EnumerateArray().ToList();
-        Assert.HasCount(2, items);
-        Assert.AreEqual(31, items[0].GetProperty("productId").GetInt32());
-        Assert.AreEqual("TrailFinder GPS Watch", items[0].GetProperty("productName").GetString());
-        Assert.AreEqual(1, items[0].GetProperty("units").GetInt32());
-        Assert.AreEqual(199.99m, items[0].GetProperty("unitPrice").GetDecimal());
-        Assert.AreEqual("Navigation", items[0].GetProperty("type").GetString());
-        Assert.AreEqual("Daybird", items[0].GetProperty("brand").GetString());
-        Assert.AreEqual(5, items[1].GetProperty("productId").GetInt32());
-        Assert.AreEqual(2, items[1].GetProperty("units").GetInt32());
-        Assert.AreEqual(45.5m, items[1].GetProperty("unitPrice").GetDecimal());
-        Assert.AreEqual("Jackets", items[1].GetProperty("type").GetString());
-        Assert.AreEqual("WildRunner", items[1].GetProperty("brand").GetString());
+        var expected = JsonElement.Parse("""
+            {
+              "today": "2026-10-29",
+              "orderNumber": 12,
+              "orderDate": "2026-10-27T15:04:05Z",
+              "status": "Shipped",
+              "items": [
+                { "productId": 31, "productName": "TrailFinder GPS Watch", "units": 1, "unitPrice": 199.99, "type": "Navigation", "brand": "Daybird" },
+                { "productId": 5, "productName": "Alpine Fleece Jacket", "units": 2, "unitPrice": 45.5, "type": "Jackets", "brand": "WildRunner" }
+              ]
+            }
+            """);
+        Assert.IsTrue(JsonElement.DeepEquals(expected, result), result.GetRawText());
     }
 
     [TestMethod]
@@ -94,14 +89,14 @@ public class GetOrderToolTests
 
         var result = await InvokeAsync(tool, 12);
 
-        var items = result.GetProperty("items").EnumerateArray().ToList();
-        Assert.HasCount(2, items);
-        Assert.AreEqual(31, items[0].GetProperty("productId").GetInt32());
-        Assert.AreEqual("TrailFinder GPS Watch", items[0].GetProperty("productName").GetString());
-        Assert.AreEqual(JsonValueKind.Null, items[0].GetProperty("type").ValueKind);
-        Assert.AreEqual(JsonValueKind.Null, items[0].GetProperty("brand").ValueKind);
-        Assert.AreEqual("Jackets", items[1].GetProperty("type").GetString());
-        Assert.AreEqual("WildRunner", items[1].GetProperty("brand").GetString());
+        var expected = JsonElement.Parse("""
+            [
+              { "productId": 31, "productName": "TrailFinder GPS Watch", "units": 1, "unitPrice": 199.99, "type": null, "brand": null },
+              { "productId": 5, "productName": "Alpine Fleece Jacket", "units": 2, "unitPrice": 45.5, "type": "Jackets", "brand": "WildRunner" }
+            ]
+            """);
+        var items = result.GetProperty("items");
+        Assert.IsTrue(JsonElement.DeepEquals(expected, items), items.GetRawText());
     }
 
     [TestMethod]

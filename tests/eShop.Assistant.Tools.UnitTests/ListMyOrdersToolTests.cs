@@ -34,17 +34,16 @@ public class ListMyOrdersToolTests
         Assert.AreEqual("/api/orders", request.RequestUri.AbsolutePath.TrimEnd('/'));
         Assert.AreEqual("1.0", System.Web.HttpUtility.ParseQueryString(request.RequestUri.Query)["api-version"]);
 
-        Assert.AreEqual("2026-10-29", result.GetProperty("today").GetString());
-        var orders = result.GetProperty("orders").EnumerateArray().ToList();
-        Assert.HasCount(2, orders);
-        Assert.AreEqual(12, orders[0].GetProperty("orderNumber").GetInt32());
-        Assert.AreEqual("2026-10-27T15:04:05Z", orders[0].GetProperty("orderDate").GetString());
-        Assert.AreEqual("Shipped", orders[0].GetProperty("status").GetString());
-        Assert.AreEqual(247.5m, orders[0].GetProperty("total").GetDecimal());
-        Assert.AreEqual(7, orders[1].GetProperty("orderNumber").GetInt32());
-        Assert.AreEqual("2026-09-30T09:00:00Z", orders[1].GetProperty("orderDate").GetString());
-        Assert.AreEqual("Cancelled", orders[1].GetProperty("status").GetString());
-        Assert.AreEqual(19.99m, orders[1].GetProperty("total").GetDecimal());
+        var expected = JsonElement.Parse("""
+            {
+              "today": "2026-10-29",
+              "orders": [
+                { "orderNumber": 12, "orderDate": "2026-10-27T15:04:05Z", "status": "Shipped", "total": 247.5 },
+                { "orderNumber": 7, "orderDate": "2026-09-30T09:00:00Z", "status": "Cancelled", "total": 19.99 }
+              ]
+            }
+            """);
+        Assert.IsTrue(JsonElement.DeepEquals(expected, result), result.GetRawText());
     }
 
     [TestMethod]

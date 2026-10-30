@@ -53,30 +53,19 @@ public class SearchPoliciesToolTests
         Assert.AreEqual("5", query["top"]);
         Assert.IsFalse(request.Headers.Contains("Authorization"));
 
-        Assert.AreEqual("keyword", result.GetProperty("mode").GetString());
-        var results = result.GetProperty("results").EnumerateArray().ToArray();
-        Assert.HasCount(2, results);
-        var first = results[0];
-        Assert.AreEqual("Returns Exceptions › GPS watches, navigators and bike computers", first.GetProperty("citation").GetString());
-        Assert.AreEqual("returns-exceptions", first.GetProperty("policySlug").GetString());
-        Assert.AreEqual("Returns Exceptions", first.GetProperty("policyTitle").GetString());
-        Assert.AreEqual("GPS watches, navigators and bike computers", first.GetProperty("section").GetString());
-        Assert.AreEqual("gps-watches-navigators-and-bike-computers", first.GetProperty("anchor").GetString());
-        Assert.AreEqual("These items have a 30-day return window.", first.GetProperty("text").GetString());
-        Assert.AreEqual(0.42, first.GetProperty("score").GetDouble());
-        Assert.AreEqual("Returns Policy", results[1].GetProperty("citation").GetString());
+        Assert.IsTrue(JsonElement.DeepEquals(JsonElement.Parse(PolicySearchResponse), result), result.GetRawText());
     }
 
     [TestMethod]
     public async Task SearchPoliciesPassesTheSemanticModeThrough()
     {
-        var policy = new FakeHandler(_ => Json(HttpStatusCode.OK, """{ "mode": "semantic", "results": [] }"""));
+        const string SemanticResponse = """{ "mode": "semantic", "results": [] }""";
+        var policy = new FakeHandler(_ => Json(HttpStatusCode.OK, SemanticResponse));
         var tool = BuildTools(policy).SearchPolicies;
 
         var result = await InvokeAsync(tool, new() { ["question"] = "how much is shipping to Canada?" });
 
-        Assert.AreEqual("semantic", result.GetProperty("mode").GetString());
-        Assert.AreEqual(0, result.GetProperty("results").GetArrayLength());
+        Assert.IsTrue(JsonElement.DeepEquals(JsonElement.Parse(SemanticResponse), result), result.GetRawText());
     }
 
     [TestMethod]

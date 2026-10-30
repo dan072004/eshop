@@ -52,15 +52,27 @@ public class SearchCatalogToolTests
         Assert.AreEqual("8", query["pageSize"]);
         Assert.AreEqual("2.0", query["api-version"]);
 
-        Assert.AreEqual(1, result.GetProperty("count").GetInt32());
-        var item = result.GetProperty("data").EnumerateArray().Single();
-        Assert.AreEqual(42, item.GetProperty("id").GetInt32());
-        Assert.AreEqual("Trailblazer Tent", item.GetProperty("name").GetString());
-        Assert.AreEqual("A two-person tent for alpine trekking.", item.GetProperty("description").GetString());
-        Assert.AreEqual(199.5m, item.GetProperty("price").GetDecimal());
-        Assert.AreEqual("product-images/42?api-version=2.0", item.GetProperty("pictureUrl").GetString());
-        Assert.AreEqual("Alpine Co", item.GetProperty("catalogBrand").GetProperty("brand").GetString());
-        Assert.AreEqual("Tents", item.GetProperty("catalogType").GetProperty("type").GetString());
+        var expected = JsonElement.Parse("""
+            {
+              "pageIndex": 0,
+              "pageSize": 8,
+              "count": 1,
+              "data": [
+                {
+                  "id": 42,
+                  "name": "Trailblazer Tent",
+                  "description": "A two-person tent for alpine trekking.",
+                  "price": 199.5,
+                  "pictureUrl": "product-images/42?api-version=2.0",
+                  "catalogBrandId": 7,
+                  "catalogBrand": { "id": 7, "brand": "Alpine Co" },
+                  "catalogTypeId": 3,
+                  "catalogType": { "id": 3, "type": "Tents" }
+                }
+              ]
+            }
+            """);
+        Assert.IsTrue(JsonElement.DeepEquals(expected, result), result.GetRawText());
     }
 
     [TestMethod]
@@ -71,9 +83,20 @@ public class SearchCatalogToolTests
 
         var result = await InvokeAsync(tool, new() { ["productDescription"] = "tent" });
 
+        var expected = JsonElement.Parse("""
+            {
+              "id": 42,
+              "name": "Trailblazer Tent",
+              "description": "A two-person tent for alpine trekking.",
+              "price": 199.5,
+              "catalogBrandId": 7,
+              "catalogBrand": { "id": 7, "brand": "Alpine Co" },
+              "catalogTypeId": 3,
+              "catalogType": { "id": 3, "type": "Tents" }
+            }
+            """);
         var item = result.GetProperty("data").EnumerateArray().Single();
-        Assert.AreEqual("Trailblazer Tent", item.GetProperty("name").GetString());
-        Assert.IsFalse(item.TryGetProperty("pictureUrl", out _));
+        Assert.IsTrue(JsonElement.DeepEquals(expected, item), item.GetRawText());
     }
 
     [TestMethod]
