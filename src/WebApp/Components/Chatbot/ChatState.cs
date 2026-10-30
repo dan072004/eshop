@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Security.Claims;
 using System.Text.Json;
+using eShop.Assistant.Tools;
 using eShop.WebAppComponents.Services;
 using Microsoft.Extensions.AI;
 
@@ -12,7 +13,6 @@ public class ChatState
     private readonly IBasketState _basketState;
     private readonly ClaimsPrincipal _user;
     private readonly ILogger _logger;
-    private readonly IProductImageUrlProvider _productImages;
     private readonly IChatClient _chatClient;
     private readonly ChatOptions _chatOptions;
 
@@ -20,14 +20,13 @@ public class ChatState
         ICatalogService catalogService,
         IBasketState basketState,
         ClaimsPrincipal user,
-        IProductImageUrlProvider productImages,
+        AssistantTools assistantTools,
         ILoggerFactory loggerFactory,
         IChatClient chatClient)
     {
         _catalogService = catalogService;
         _basketState = basketState;
         _user = user;
-        _productImages = productImages;
         _logger = loggerFactory.CreateLogger(typeof(ChatState));
 
         if (_logger.IsEnabled(LogLevel.Debug))
@@ -41,7 +40,10 @@ public class ChatState
             Tools =
             [
                 AIFunctionFactory.Create(GetUserInfo),
-                AIFunctionFactory.Create(SearchCatalog),
+                assistantTools.SearchPolicies,
+                assistantTools.SearchCatalog,
+                assistantTools.ListMyOrders,
+                assistantTools.GetOrder,
                 AIFunctionFactory.Create(AddToCart),
                 AIFunctionFactory.Create(GetCartContents),
             ],
@@ -52,14 +54,17 @@ public class ChatState
             new ChatMessage(ChatRole.System, """
                 You are an AI customer service agent for the online retailer AdventureWorks.
                 You NEVER respond about topics other than AdventureWorks.
-                Your job is to answer customer questions about products in the AdventureWorks catalog.
+                Your job is to answer customer questions about products in the AdventureWorks catalog,
+                their orders, and the AdventureWorks Policies (returns, exchanges, shipping, warranty, sizing and payments).
                 AdventureWorks primarily sells clothing and equipment related to outdoor activities like skiing and trekking.
                 You try to be concise and only provide longer responses if necessary.
-                If someone asks a question about anything other than AdventureWorks, its catalog, or their account,
+                For a question about a Policy, search the Policies. State Policy rules only from the search results;
+                cite each rule with its citation value; if no result answers the question, say so instead of guessing.
+                If someone asks a question about anything other than AdventureWorks, its catalog, its Policies, or their account and orders,
                 you refuse to answer, and you instead ask if there's a topic related to AdventureWorks you can assist with.
                 """),
             new ChatMessage(ChatRole.Assistant, """
-                Hi! I'm the AdventureWorks Concierge. How can I help?
+                Hi! I'm the AdventureWorks Shopping Assistant. How can I help?
                 """),
         ];
     }
@@ -112,25 +117,6 @@ public class ChatState
 
         static string GetValue(IEnumerable<Claim> claims, string claimType) =>
             claims.FirstOrDefault(x => x.Type == claimType)?.Value ?? "";
-    }
-
-    [Description("Searches the AdventureWorks catalog for a provided product description")]
-    private async Task<string> SearchCatalog([Description("The product description for which to search")] string productDescription)
-    {
-        try
-        {
-            var results = await _catalogService.GetCatalogItemsWithSemanticRelevance(0, 8, productDescription!);
-            for (int i = 0; i < results.Data.Count; i++)
-            {
-                results.Data[i] = results.Data[i] with { PictureUrl = _productImages.GetProductImageUrl(results.Data[i].Id) };
-            }
-
-            return JsonSerializer.Serialize(results);
-        }
-        catch (HttpRequestException e)
-        {
-            return Error(e, "Error accessing catalog.");
-        }
     }
 
     [Description("Adds a product to the user's shopping cart.")]

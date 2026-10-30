@@ -1,7 +1,9 @@
 ﻿using System.Globalization;
 using Anthropic;
 using Anthropic.Core;
+using eShop.Assistant.Tools;
 using eShop.Basket.API.Grpc;
+using eShop.WebApp.Services.AccessTokens;
 using eShop.WebApp.Services.OrderStatus.IntegrationEvents;
 using eShop.WebAppComponents.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -41,6 +43,13 @@ public static class Extensions
         builder.Services.AddHttpClient<OrderingService>(o => o.BaseAddress = new("https+http://ordering-api"))
             .AddApiVersion(1.0)
             .AddAuthToken();
+
+        // The Shopping Assistant's shared tools (eShop.Mcp uses the same library). WebApp's picture URLs are relative to its own site.
+        var assistantTools = builder.Services.AddAssistantTools()
+            .WithProductPictureUrl(services => services.GetRequiredService<IProductImageUrlProvider>().GetProductImageUrl);
+
+        // The tools run inside the chat's interactive session, so the Buyer's token comes from the circuit's token holder.
+        assistantTools.OrderingClient.AddAccessTokenFromHolder();
     }
 
     public static void AddEventBusSubscriptions(this IEventBusBuilder eventBus)
