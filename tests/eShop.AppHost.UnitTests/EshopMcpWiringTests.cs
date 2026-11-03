@@ -55,17 +55,6 @@ public class EshopMcpWiringTests
 
     [TestMethod]
     [DoNotParallelize]
-    public async Task IdentityApiReceivesEshopMcpsUrl()
-    {
-        await using var appHost = await CreateAppHostAsync(useHttpEndpoints: false);
-
-        var identityEnvironment = await EnvironmentOf(appHost, Resource(appHost, "identity-api"));
-
-        Assert.AreEqual("{eshop-mcp.bindings.https.url}", identityEnvironment["EshopMcpClient"]);
-    }
-
-    [TestMethod]
-    [DoNotParallelize]
     public async Task EshopMcpUsesTheHttpProfileWhenHttpEndpointsAreForced()
     {
         await using var appHost = await CreateAppHostAsync(useHttpEndpoints: true);
@@ -75,8 +64,6 @@ public class EshopMcpWiringTests
         Assert.AreEqual("http", endpoint.Name);
         Assert.AreEqual(5229, endpoint.Port);
         Assert.AreEqual("{identity-api.bindings.http.url}", (await EnvironmentOf(appHost, mcp))["Identity__Url"]);
-        var identityEnvironment = await EnvironmentOf(appHost, Resource(appHost, "identity-api"));
-        Assert.AreEqual("{eshop-mcp.bindings.http.url}", identityEnvironment["EshopMcpClient"]);
     }
 
     // The AppHost reads ESHOP_USE_HTTP_ENDPOINTS from the process environment, hence [DoNotParallelize] above.

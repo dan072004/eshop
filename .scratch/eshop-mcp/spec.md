@@ -101,7 +101,7 @@ For "what's the return window for my last order?" in Claude Code, on a shipped o
 - Add `eshop-mcp` with references to `policy-api`, `catalog-api` and `ordering-api`. It waits for Identity.API and receives `Identity__Url` set to the same Identity endpoint as the APIs.
 - It uses the shared http/https launch-profile switch (`ESHOP_USE_HTTP_ENDPOINTS`), like WebApp. Its launch settings fix its ports, so client configuration stays valid.
 - It is not marked for external endpoints and not added to mobile-bff. Its clients run on the same machine.
-- Identity.API receives eShop.Mcp's URL, the same way it receives the other client URLs. That adds eShop.Mcp to the existing deliberate reference cycle.
+- Identity.API does not receive eShop.Mcp's URL. The other `*Client` URLs exist to build redirect URIs, but eShop.Mcp is an API resource that Identity.API knows only by the name `eshop-mcp`, and its clients redirect to their own loopback addresses. So eShop.Mcp stays out of the reference cycle.
 
 **Client setup (developer documentation)**
 
@@ -134,7 +134,6 @@ The MCP caller is a **Buyer**. eShop.Mcp is not the **Shopping Assistant**, whic
 - **AppHost wiring: fast tests in `eShop.AppHost.UnitTests`** (prior art: `AppHostConfigurationTests`).
   - `eshop-mcp` exists and references policy-api, catalog-api and ordering-api.
   - Its `Identity__Url` is the same endpoint Ordering.API gets.
-  - Identity.API receives eShop.Mcp's URL.
   - It uses the http launch profile when `ESHOP_USE_HTTP_ENDPOINTS=1`.
 - **Identity.API clients: no automated test.** They are configuration, Identity.API has no test project, and a test would only repeat the configured values. The manual acceptance check exercises them.
 - **Acceptance check: manual, not in CI.** It runs after the Shopping Assistant's acceptance check passes, since that is the gate.
