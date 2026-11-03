@@ -2,6 +2,7 @@
 
 public record Orderitem
 {
+    public int ProductId { get; init; }
     public string ProductName { get; init; }
     public int Units { get; init; }
     public double UnitPrice { get; init; }

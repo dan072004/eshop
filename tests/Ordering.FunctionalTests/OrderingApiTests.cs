@@ -159,6 +159,62 @@ public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
     }
 
     [Fact]
+    public async Task OrderDetailsIncludeEachItemsProductId()
+    {
+        // Arrange
+        var orderId = await SeedOrderAsync(
+            ownerIdentity: AutoAuthorizeMiddleware.IDENTITY_ID,
+            items: [(ProductId: 42, Name: "Trail boots"), (ProductId: 97, Name: "Hiking socks")]);
+
+        // Act
+        var order = await ReadOrderAsync(orderId);
+
+        // Assert: every item carries the product id it was ordered with.
+        Assert.Equal(
+            [(42, "Trail boots"), (97, "Hiking socks")],
+            order.OrderItems.Select(i => (i.ProductId, i.ProductName)).OrderBy(i => i.ProductId));
+    }
+
+    [Fact]
+    public async Task OrderListIsNewestFirstByOrderDate()
+    {
+        // Arrange: the lower Order number gets the later date, so only date ordering lists it first.
+        var firstSeeded = await SeedOrderAsync(AutoAuthorizeMiddleware.IDENTITY_ID);
+        var secondSeeded = await SeedOrderAsync(AutoAuthorizeMiddleware.IDENTITY_ID);
+        var baseDate = DateTime.UtcNow.AddYears(50);
+        await SetOrderDateAsync(firstSeeded, baseDate.AddMinutes(1));
+        await SetOrderDateAsync(secondSeeded, baseDate);
+
+        // Act
+        var orderNumbers = await ListMyOrderNumbersAsync();
+
+        // Assert
+        Assert.True(
+            orderNumbers.IndexOf(firstSeeded) < orderNumbers.IndexOf(secondSeeded),
+            $"Expected {firstSeeded} (later date) before {secondSeeded}, got [{string.Join(", ", orderNumbers)}]");
+    }
+
+    [Fact]
+    public async Task OrdersWithTheSameDateAreListedByOrderNumberDescending()
+    {
+        // Arrange
+        var lower = await SeedOrderAsync(AutoAuthorizeMiddleware.IDENTITY_ID);
+        var higher = await SeedOrderAsync(AutoAuthorizeMiddleware.IDENTITY_ID);
+        var sameDate = DateTime.UtcNow.AddYears(60);
+        await SetOrderDateAsync(lower, sameDate);
+        await SetOrderDateAsync(higher, sameDate);
+
+        // Act
+        var orderNumbers = await ListMyOrderNumbersAsync();
+
+        // Assert
+        Assert.True(lower < higher);
+        Assert.True(
+            orderNumbers.IndexOf(higher) < orderNumbers.IndexOf(lower),
+            $"Expected {higher} before {lower}, got [{string.Join(", ", orderNumbers)}]");
+    }
+
+    [Fact]
     public async Task GetStoredOrdersWithOrderId()
     {
         // Act
@@ -312,7 +368,7 @@ public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
     }
 
     // Writes a Submitted Order owned by the given identity straight to the database and returns its number.
-    private async Task<int> SeedOrderAsync(string ownerIdentity)
+    private async Task<int> SeedOrderAsync(string ownerIdentity, (int ProductId, string Name)[] items = null)
     {
         using var scope = _webApplicationFactory.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<OrderingContext>();
@@ -332,7 +388,10 @@ public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
             cardTypeId: 1, cardNumber: "1234", cardSecurityNumber: "123",
             cardHolderName: "Test Buyer", cardExpiration: DateTime.UtcNow.AddYears(1),
             buyerId: buyer.Id);
-        order.AddOrderItem(1, "Test product", 10m, 0m, "pic", 1);
+        foreach (var (productId, name) in items ?? [(1, "Test product")])
+        {
+            order.AddOrderItem(productId, name, 10m, 0m, "pic", 1);
+        }
 
         context.Orders.Add(order);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -398,6 +457,27 @@ public sealed class OrderingApiTests : IClassFixture<OrderingApiFixture>
             Headers = { { "x-requestid", requestId.ToString() } }
         };
         return _httpClient.PostAsync("api/orders", content, TestContext.Current.CancellationToken);
+    }
+
+    // Overwrites an Order's date in the database, so list ordering can be tested with chosen dates.
+    private async Task SetOrderDateAsync(int orderId, DateTime orderDate)
+    {
+        using var scope = _webApplicationFactory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<OrderingContext>();
+        var order = await context.Orders.SingleAsync(o => o.Id == orderId, TestContext.Current.CancellationToken);
+        context.Entry(order).Property(o => o.OrderDate).CurrentValue = orderDate;
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+    }
+
+    // The Order numbers the API lists for the fixed test identity, in the order it returns them.
+    private async Task<List<int>> ListMyOrderNumbersAsync()
+    {
+        var response = await _httpClient.GetAsync("api/orders", TestContext.Current.CancellationToken);
+        response.EnsureSuccessStatusCode();
+        var orders = JsonSerializer.Deserialize<List<OrderSummary>>(
+            await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
+            CamelCaseJson);
+        return orders.Select(o => o.OrderNumber).ToList();
     }
 
     // Counts the Orders the API lists for the fixed test identity.
