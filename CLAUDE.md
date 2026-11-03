@@ -80,6 +80,23 @@ Test behaviour through a public **seam** (an HTTP endpoint, a repository interfa
 
 Reference examples: `WebhooksApiTests.SubscriptionLifecyclePersistsAndIsScopedToUser` (HTTP), `RedisBasketRepositoryTests` (real adapter), `OrderAggregateTest.when_add_two_times_on_the_same_item_then_the_total_of_order_should_be_the_sum_of_the_two_items` (domain), `WebhookTests` (fakes only the outbound `HttpMessageHandler`).
 
+### Readable tests
+
+A test reads like a **specification**: its name states the behaviour, and its body shows only the inputs and expected outputs that behaviour depends on.
+
+- Name tests after the behaviour and its outcome (`CancellingAnUnknownOrderReturnsNotFound`).
+- Assert on expected data written as literals:
+  - The fields of one object that matter: `Assert.Equivalent(new { Status = "Submitted", Total = 10m }, order)`. It compares only the listed members.
+  - A collection, exactly and in order: project to tuples and `Assert.Equal([(42, "Trail boots")], items.Select(i => (i.ProductId, i.ProductName)))`. For ordering, filter to the seeded items and compare the sequence.
+  - A whole contract (every field, extras fail): `JsonElement.DeepEquals` against expected JSON written as a raw string literal, as in the assistant tool tests. A literal can't share the serializer it checks: the tools' output relies on per-property settings (e.g. `JsonIgnoreCondition.Never` keeps `"type": null`), and an expected value serialized from a C# object would drop or keep fields the same way the code under test does.
+- Write a faked HTTP response body as a PascalCase anonymous type and send it with `FakeHandler.Json(status, object)`, which serializes with web defaults (camelCase) like the real API. Keep a body as a string only when the test needs it to be invalid JSON.
+- Every assertion must be able to fail. `Assert.All` takes an `Action`, so a lambda that returns `bool` asserts nothing; assert inside it.
+- A failure-path test sets up a valid request with exactly one thing wrong, so the status code has one cause.
+- A test that only checks for 200 earns its place only if the endpoint can't return 200 on failure. Otherwise, read the result back.
+- Each behaviour is tested once. When a stronger test covers a weaker one, delete the weaker one.
+
+Reference: `OrderingApiTests`.
+
 ## Repo skills
 
 `.github/skills/` contains agent skills for the Aspire CLI (`aspire`, `aspire-orchestration` for file locks and orphaned processes, `aspire-monitoring` for logs, traces and the dashboard, `aspire-deployment`), `dotnet-inspect` (querying NuGet and .NET APIs), and `playwright-cli`. Read the relevant `SKILL.md` before working in those areas.

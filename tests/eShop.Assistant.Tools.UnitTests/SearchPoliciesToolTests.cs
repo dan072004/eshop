@@ -8,32 +8,34 @@ namespace eShop.Assistant.Tools.UnitTests;
 [TestClass]
 public class SearchPoliciesToolTests
 {
-    // What policy-api returns from GET /api/policies/search (PolicySearchResponse, web JSON casing).
-    private const string PolicySearchResponse = """
+    // What policy-api returns from GET /api/policies/search (PolicySearchResponse; Json serialises it with web casing).
+    private static readonly object PolicySearchResponse = new
+    {
+        Mode = "keyword",
+        Results = new[]
         {
-          "mode": "keyword",
-          "results": [
+            new
             {
-              "citation": "Returns Exceptions › GPS watches, navigators and bike computers",
-              "policySlug": "returns-exceptions",
-              "policyTitle": "Returns Exceptions",
-              "section": "GPS watches, navigators and bike computers",
-              "anchor": "gps-watches-navigators-and-bike-computers",
-              "text": "These items have a 30-day return window.",
-              "score": 0.42
+                Citation = "Returns Exceptions › GPS watches, navigators and bike computers",
+                PolicySlug = "returns-exceptions",
+                PolicyTitle = "Returns Exceptions",
+                Section = "GPS watches, navigators and bike computers",
+                Anchor = "gps-watches-navigators-and-bike-computers",
+                Text = "These items have a 30-day return window.",
+                Score = 0.42,
             },
+            new
             {
-              "citation": "Returns Policy",
-              "policySlug": "returns-policy",
-              "policyTitle": "Returns Policy",
-              "section": "Returns Policy",
-              "anchor": "returns-policy",
-              "text": "We want you to love your gear.",
-              "score": 0.1
-            }
-          ]
-        }
-        """;
+                Citation = "Returns Policy",
+                PolicySlug = "returns-policy",
+                PolicyTitle = "Returns Policy",
+                Section = "Returns Policy",
+                Anchor = "returns-policy",
+                Text = "We want you to love your gear.",
+                Score = 0.1,
+            },
+        },
+    };
 
     public TestContext TestContext { get; set; } = null!;
 
@@ -53,19 +55,19 @@ public class SearchPoliciesToolTests
         Assert.AreEqual("5", query["top"]);
         Assert.IsFalse(request.Headers.Contains("Authorization"));
 
-        Assert.IsTrue(JsonElement.DeepEquals(JsonElement.Parse(PolicySearchResponse), result), result.GetRawText());
+        Assert.IsTrue(JsonElement.DeepEquals(WireJson(PolicySearchResponse), result), result.GetRawText());
     }
 
     [TestMethod]
     public async Task SearchPoliciesPassesTheSemanticModeThrough()
     {
-        const string SemanticResponse = """{ "mode": "semantic", "results": [] }""";
-        var policy = new FakeHandler(_ => Json(HttpStatusCode.OK, SemanticResponse));
+        var semanticResponse = new { Mode = "semantic", Results = Array.Empty<object>() };
+        var policy = new FakeHandler(_ => Json(HttpStatusCode.OK, semanticResponse));
         var tool = BuildTools(policy).SearchPolicies;
 
         var result = await InvokeAsync(tool, new() { ["question"] = "how much is shipping to Canada?" });
 
-        Assert.IsTrue(JsonElement.DeepEquals(JsonElement.Parse(SemanticResponse), result), result.GetRawText());
+        Assert.IsTrue(JsonElement.DeepEquals(WireJson(semanticResponse), result), result.GetRawText());
     }
 
     [TestMethod]

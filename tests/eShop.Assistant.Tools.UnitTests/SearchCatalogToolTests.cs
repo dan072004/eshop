@@ -8,31 +8,32 @@ namespace eShop.Assistant.Tools.UnitTests;
 [TestClass]
 public class SearchCatalogToolTests
 {
-    // What Catalog.API v2 returns from items/withsemanticrelevance (PaginatedItems<CatalogItem>, web JSON casing).
-    private const string CatalogPage = """
+    // What Catalog.API v2 returns from items/withsemanticrelevance (PaginatedItems<CatalogItem>; Json serialises it with web casing).
+    private static readonly object CatalogPage = new
+    {
+        PageIndex = 0,
+        PageSize = 8,
+        Count = 1,
+        Data = new[]
         {
-          "pageIndex": 0,
-          "pageSize": 8,
-          "count": 1,
-          "data": [
+            new
             {
-              "id": 42,
-              "name": "Trailblazer Tent",
-              "description": "A two-person tent for alpine trekking.",
-              "price": 199.5,
-              "pictureFileName": "42.webp",
-              "catalogTypeId": 3,
-              "catalogType": { "id": 3, "type": "Tents" },
-              "catalogBrandId": 7,
-              "catalogBrand": { "id": 7, "brand": "Alpine Co" },
-              "availableStock": 100,
-              "restockThreshold": 10,
-              "maxStockThreshold": 200,
-              "onReorder": false
-            }
-          ]
-        }
-        """;
+                Id = 42,
+                Name = "Trailblazer Tent",
+                Description = "A two-person tent for alpine trekking.",
+                Price = 199.5m,
+                PictureFileName = "42.webp",
+                CatalogTypeId = 3,
+                CatalogType = new { Id = 3, Type = "Tents" },
+                CatalogBrandId = 7,
+                CatalogBrand = new { Id = 7, Brand = "Alpine Co" },
+                AvailableStock = 100,
+                RestockThreshold = 10,
+                MaxStockThreshold = 200,
+                OnReorder = false,
+            },
+        },
+    };
 
     public TestContext TestContext { get; set; } = null!;
 

@@ -8,41 +8,36 @@ namespace eShop.Assistant.Tools.UnitTests;
 [TestClass]
 public class GetOrderToolTests
 {
-    // What Ordering.API v1 returns from GET api/orders/12 (its Order view model, web JSON casing).
-    private const string OrderDetailsJson = """
+    // What Ordering.API v1 returns from GET api/orders/12 (its Order view model; Json serialises it with web casing).
+    private static readonly object OrderDetails = new
+    {
+        OrderNumber = 12,
+        Date = "2026-10-27T15:04:05Z",
+        Status = "Shipped",
+        Description = (string?)null,
+        Street = "1 Main St",
+        City = "Redmond",
+        State = "WA",
+        Zipcode = "98052",
+        Country = "US",
+        OrderItems = new[]
         {
-          "orderNumber": 12,
-          "date": "2026-10-27T15:04:05Z",
-          "status": "Shipped",
-          "description": null,
-          "street": "1 Main St",
-          "city": "Redmond",
-          "state": "WA",
-          "zipcode": "98052",
-          "country": "US",
-          "orderItems": [
-            { "productId": 31, "productName": "TrailFinder GPS Watch", "units": 1, "unitPrice": 199.99, "pictureUrl": "" },
-            { "productId": 5, "productName": "Alpine Fleece Jacket", "units": 2, "unitPrice": 45.5, "pictureUrl": "" }
-          ],
-          "total": 290.99
-        }
-        """;
+            new { ProductId = 31, ProductName = "TrailFinder GPS Watch", Units = 1, UnitPrice = 199.99m, PictureUrl = "" },
+            new { ProductId = 5, ProductName = "Alpine Fleece Jacket", Units = 2, UnitPrice = 45.5m, PictureUrl = "" },
+        },
+        Total = 290.99m,
+    };
 
     // What Catalog.API returns from GET api/catalog/items/by (CatalogItem without its navigation properties).
-    private const string CatalogItems = """
-        [
-          { "id": 5, "name": "Alpine Fleece Jacket", "price": 45.5, "catalogTypeId": 2, "catalogType": null, "catalogBrandId": 9, "catalogBrand": null, "availableStock": 10 },
-          { "id": 31, "name": "TrailFinder GPS Watch", "price": 199.99, "catalogTypeId": 4, "catalogType": null, "catalogBrandId": 3, "catalogBrand": null, "availableStock": 10 }
-        ]
-        """;
+    private static readonly object CatalogItems = new[]
+    {
+        new { Id = 5, Name = "Alpine Fleece Jacket", Price = 45.5m, CatalogTypeId = 2, CatalogType = (object?)null, CatalogBrandId = 9, CatalogBrand = (object?)null, AvailableStock = 10 },
+        new { Id = 31, Name = "TrailFinder GPS Watch", Price = 199.99m, CatalogTypeId = 4, CatalogType = (object?)null, CatalogBrandId = 3, CatalogBrand = (object?)null, AvailableStock = 10 },
+    };
 
-    private const string CatalogTypes = """
-        [ { "id": 2, "type": "Jackets" }, { "id": 4, "type": "Navigation" } ]
-        """;
+    private static readonly object CatalogTypes = new[] { new { Id = 2, Type = "Jackets" }, new { Id = 4, Type = "Navigation" } };
 
-    private const string CatalogBrands = """
-        [ { "id": 3, "brand": "Daybird" }, { "id": 9, "brand": "WildRunner" } ]
-        """;
+    private static readonly object CatalogBrands = new[] { new { Id = 3, Brand = "Daybird" }, new { Id = 9, Brand = "WildRunner" } };
 
     private static readonly DateTimeOffset Now = new(2026, 10, 29, 23, 30, 0, TimeSpan.Zero);
 
@@ -51,7 +46,7 @@ public class GetOrderToolTests
     [TestMethod]
     public async Task GetOrderReturnsTheOrderWithEachItemsTypeAndBrandFromCatalog()
     {
-        var ordering = new FakeHandler(_ => Json(HttpStatusCode.OK, OrderDetailsJson));
+        var ordering = new FakeHandler(_ => Json(HttpStatusCode.OK, OrderDetails));
         var catalog = CatalogHandler(CatalogItems);
         var tool = BuildTools(ordering, catalog).GetOrder;
 
@@ -81,11 +76,9 @@ public class GetOrderToolTests
     public async Task GetOrderGivesNullTypeAndBrandToAProductCatalogDoesNotKnow()
     {
         // Catalog's batch endpoint leaves unknown ids out; here it knows only product 5.
-        const string OnlyTheJacket = """
-            [ { "id": 5, "name": "Alpine Fleece Jacket", "price": 45.5, "catalogTypeId": 2, "catalogBrandId": 9 } ]
-            """;
-        var ordering = new FakeHandler(_ => Json(HttpStatusCode.OK, OrderDetailsJson));
-        var tool = BuildTools(ordering, CatalogHandler(OnlyTheJacket)).GetOrder;
+        var onlyTheJacket = new[] { new { Id = 5, Name = "Alpine Fleece Jacket", Price = 45.5m, CatalogTypeId = 2, CatalogBrandId = 9 } };
+        var ordering = new FakeHandler(_ => Json(HttpStatusCode.OK, OrderDetails));
+        var tool = BuildTools(ordering, CatalogHandler(onlyTheJacket)).GetOrder;
 
         var result = await InvokeAsync(tool, 12);
 
@@ -121,7 +114,7 @@ public class GetOrderToolTests
     public async Task GetOrderReturnsUnavailableWhenCatalogFails()
     {
         // Without types the model could apply the wrong Return Window, so a Catalog outage is not hidden as nulls.
-        var ordering = new FakeHandler(_ => Json(HttpStatusCode.OK, OrderDetailsJson));
+        var ordering = new FakeHandler(_ => Json(HttpStatusCode.OK, OrderDetails));
         var catalog = new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
         var tool = BuildTools(ordering, catalog).GetOrder;
 
@@ -134,7 +127,7 @@ public class GetOrderToolTests
     [TestMethod]
     public void GetOrderHasTheContractNameParameterNameAndSearchByTypeRule()
     {
-        var tools = BuildTools(new FakeHandler(_ => Json(HttpStatusCode.OK, OrderDetailsJson)), CatalogHandler(CatalogItems));
+        var tools = BuildTools(new FakeHandler(_ => Json(HttpStatusCode.OK, OrderDetails)), CatalogHandler(CatalogItems));
         var tool = tools.GetOrder;
 
         Assert.AreEqual("get_order", tool.Name);
@@ -152,7 +145,7 @@ public class GetOrderToolTests
             tools.All.Select(t => t.Name).ToArray());
     }
 
-    private static FakeHandler CatalogHandler(string items) => new(request => request.RequestUri!.AbsolutePath switch
+    private static FakeHandler CatalogHandler(object items) => new(request => request.RequestUri!.AbsolutePath switch
     {
         "/api/catalog/items/by" => Json(HttpStatusCode.OK, items),
         "/api/catalog/catalogtypes" => Json(HttpStatusCode.OK, CatalogTypes),

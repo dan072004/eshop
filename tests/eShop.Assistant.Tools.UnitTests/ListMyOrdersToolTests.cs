@@ -8,13 +8,12 @@ namespace eShop.Assistant.Tools.UnitTests;
 [TestClass]
 public class ListMyOrdersToolTests
 {
-    // What Ordering.API v1 returns from GET api/orders (OrderSummary, web JSON casing), already newest-first.
-    private const string OrderingOrders = """
-        [
-          { "orderNumber": 12, "date": "2026-10-27T15:04:05Z", "status": "Shipped", "total": 247.5 },
-          { "orderNumber": 7, "date": "2026-09-30T09:00:00Z", "status": "Cancelled", "total": 19.99 }
-        ]
-        """;
+    // What Ordering.API v1 returns from GET api/orders (OrderSummary; Json serialises it with web casing), already newest-first.
+    private static readonly object OrderingOrders = new[]
+    {
+        new { OrderNumber = 12, Date = "2026-10-27T15:04:05Z", Status = "Shipped", Total = 247.5m },
+        new { OrderNumber = 7, Date = "2026-09-30T09:00:00Z", Status = "Cancelled", Total = 19.99m },
+    };
 
     private static readonly DateTimeOffset Now = new(2026, 10, 29, 23, 30, 0, TimeSpan.Zero);
 
@@ -74,7 +73,7 @@ public class ListMyOrdersToolTests
     [TestMethod]
     public void ListMyOrdersHasTheContractNameNoParametersAndPointsToGetOrder()
     {
-        var tools = BuildTools(new FakeHandler(_ => Json(HttpStatusCode.OK, "[]")));
+        var tools = BuildTools(new FakeHandler(_ => Json(HttpStatusCode.OK, Array.Empty<object>())));
         var tool = tools.ListMyOrders;
 
         Assert.AreEqual("list_my_orders", tool.Name);
