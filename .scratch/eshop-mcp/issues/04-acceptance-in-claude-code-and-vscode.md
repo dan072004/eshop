@@ -2,7 +2,7 @@
 
 **What to build:** Run the eshop-mcp spec's manual acceptance script end to end and record the results. It proves the week's done-when: Claude Code answers "what's the return window for my last order?" with a Citation.
 
-**Blocked by:** 02 (Claude Code and VS Code sign in), 03 (Policy and order tools), assistant-policies-and-orders 08 (Shopping Assistant acceptance check, which is the gate)
+**Blocked by:** 02 (Claude Code and VS Code sign in), 03 (Policy and order tools), 07 (order tools use the exchanged token), assistant-policies-and-orders 08 (Shopping Assistant acceptance check, which is the gate)
 
 **Status:** ready-for-human
 
@@ -14,3 +14,11 @@
 - [ ] The same question from Copilot in VS Code, signed in as alice, gets the same answer
 - [ ] The same with `EmbeddingProvider=None` (keyword mode), with the same Citations
 - [ ] Results recorded in the ticket's comments
+
+## Comments
+
+**Replanned (2026-11-04).** Now blocked by 07 as well. Run the acceptance script from the rewritten spec, which differs from the list above:
+- `aspire run` with `ESHOP_USE_HTTP_ENDPOINTS=1`
+- sign-in completes without `invalid_target`
+- the Aspire traces show a token-exchange call before each Ordering call
+- reconnecting Claude Code doesn't prompt for consent again

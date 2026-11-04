@@ -166,6 +166,7 @@ Then run `/mcp` in Claude Code and choose **Authenticate** for `eshop`. The call
 Claude Code doesn't trust the .NET development certificate by default, so the HTTPS URL fails with a certificate error. Export the certificate and point `NODE_EXTRA_CA_CERTS` at it before starting Claude Code:
 
 ```powershell
+New-Item -ItemType Directory -Force "$HOME/.aspnet" | Out-Null
 dotnet dev-certs https --export-path "$HOME/.aspnet/dev-cert.pem" --format Pem --no-password
 $env:NODE_EXTRA_CA_CERTS = "$HOME/.aspnet/dev-cert.pem"
 claude

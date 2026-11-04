@@ -15,7 +15,7 @@
 
 This is where two unverified assumptions get proven: that Duende's exact redirect matching accepts Claude Code's fixed-port loopback URIs, and that the VS Code redirect URIs (taken from third-party guides) are right. If the fixed port doesn't work, the fallback is a loopback-aware redirect validator for these two clients only. Record it in ADR 0005 if it's needed.
 
-**Blocked by:** 01 (eShop.Mcp serves `search_catalog`)
+**Blocked by:** 01 (eShop.Mcp serves `search_catalog`), 05 (clients sign in with eShop.Mcp's URL as the resource)
 
 **Status:** ready-for-human
 
@@ -56,3 +56,46 @@ Security review (security-reviewer agent), with no findings above medium. All th
 - Medium: no API checks scopes, and `ValidateAudience = false`, so an MCP client's token (and its 30-day refresh token) can also call Ordering write endpoints, Basket and Webhooks. The fix is the deferred hardening ticket: per-API scope policies plus audience validation. A shorter `AbsoluteRefreshTokenLifetime` for the MCP clients is worth considering.
 - Low: `https://vscode.dev/redirect` lets any website start a `client_id=vscode` flow. Remove it if the manual check shows VS Code desktop doesn't use it.
 - Low: with fixed loopback ports and remembered consent, local malware that binds the port first can get a token silently. RFC 8252 accepts this risk.
+
+**Manual check, Claude Code 2.1.286 (2026-11-03): sign-in blocked, first by TLS, then by `invalid_target`.**
+
+TLS. The documented `NODE_EXTRA_CA_CERTS` fix does not work on this version:
+- The dev cert served on 7229 is valid (signature, SANs, expiry 2027-09-22) and trusted in `CurrentUser\Root`.
+- First error, `CERT_SIGNATURE_FAILURE`: the Azure Cosmos DB Emulator certs (`DocumentDbEmulatorCertificate`, `CosmosEmulatorSecrets`) are also self-signed `CN=localhost` roots without key identifiers. Claude Code's runtime picked one of them as the dev cert's issuer. Reproduced with Bun 1.4.4 `--use-system-ca`, and cleared by removing both from the trusted roots. Any developer with the emulator installed hits this.
+- Then `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, with `NODE_EXTRA_CA_CERTS` set. The debug log (`claude --debug mcp get eshop`) confirms the PEM was appended. The failure comes after `version negotiation probe failed on the http transport; reconnecting pinned legacy`, so that reconnect path appears to ignore the custom CA list. Bun alone, with the same environment, connects fine (401). This looks like a Claude Code bug.
+- The `ESHOP_USE_HTTP_ENDPOINTS=1` fallback works, but only when the whole AppHost runs on HTTP. With eShop.Mcp on `http://localhost:5229/mcp` alone, the OAuth calls to Identity.API on `https://localhost:5243` fail the same way.
+- The README's "Trusting the .NET dev certificate" step needs correcting: make `ESHOP_USE_HTTP_ENDPOINTS=1` the primary path for Claude Code, and mention the Cosmos emulator conflict.
+
+Sign-in. With everything on HTTP, the browser reaches Identity.API, which answers `invalid_target` / "Invalid resource indicator" (request id `0HNPPT1SFJ12I:00000001`):
+- Claude Code sends an RFC 8707 `resource` parameter, as the MCP authorization spec requires. Its value is the `resource` from eShop.Mcp's protected resource metadata, i.e. the server URL `http://localhost:5229/mcp` (`McpServerExtensions.cs`, `OnResourceMetadataRequest`).
+- Duende accepts a `resource` only when it is the name of an `ApiResource`, and ours is named `eshop-mcp` (`Config.cs`). So no resource matches.
+- This would fail on HTTPS (`https://localhost:7229/mcp`) as well. It is not caused by the HTTP fallback.
+- Assumption 1 (fixed-port loopback redirect) and remembered consent are still unverified. The flow fails before the redirect.
+
+This breaks two design assumptions:
+- Identity.API must know eShop.Mcp's URL after all. The resource's name has to be the URL clients send, which depends on the http/https profile. That contradicts `aa8d7c1` ("Stop passing eShop.Mcp's URL to Identity.API") and the spec line it changed.
+- The two-audience token from ADR 0005 is at risk. When a request names a resource, Duende restricts the access token to that resource. So `aud: orders`, which eShop.Mcp requires before forwarding to Ordering, is probably dropped. Unverified: probe it before choosing.
+
+Options:
+1. Name the `ApiResource` with the eShop.Mcp URL, passed in by the AppHost as before `aa8d7c1`, and have eShop.Mcp validate that URL as its audience. Then decide how Ordering gets a token naming `orders`: put the `orders` scope on the MCP resource and relax the forwarding rule, or use token exchange. Either way ADR 0005 changes. This is the recommended option, because it follows the MCP spec.
+2. Advertise `eshop-mcp` as the metadata `resource`. It is not the canonical server URI the spec requires, and Claude Code may refuse metadata whose `resource` doesn't match the server URL. Not recommended.
+
+Next step: probe Duende 7.3.2 with `resource=<url>` plus scopes `eshop-mcp orders` to see which audiences and scopes come back. Then choose an option and update ADR 0005, the spec and the README to match.
+
+**Prototype (2026-11-03): Duende 7.3.2 with resource indicators.** `src/Identity.API.ResourceIndicatorPrototype` on branch `prototype/resource-indicators` (commit `2d9d463`, throwaway, not for merging; run it with `dotnet run --project src/Identity.API.ResourceIndicatorPrototype`) runs the real Duende pipeline in memory: sign-in, authorize with code and PKCE, code exchange, then refresh. Every request carries `resource=http://localhost:5229/mcp`, as Claude Code's do. The client mirrors `claude-code`, without consent.
+
+| ApiResources | Authorize | Access token (code exchange and refresh agree) |
+|---|---|---|
+| A0: today's, no `resource` (baseline) | OK | `aud=[eshop-mcp, orders]` |
+| A: today's (`eshop-mcp`, `orders`) | `invalid_target: Invalid resource indicator` (matches the manual check) | (none) |
+| B: `<MCP URL>` [eshop-mcp], `orders` [orders] | OK | `aud=<MCP URL>`, `scope=[eshop-mcp, offline_access]`. `orders` is dropped |
+| C: `<MCP URL>` [eshop-mcp, orders], `orders` [orders] | OK | `aud=<MCP URL>`, `scope=[eshop-mcp, orders, offline_access]`. There is no `aud: orders` |
+
+Verdict:
+- Naming the resource by its URL fixes the sign-in (B and C).
+- With a spec-compliant client, the token names only the requested resource. No configuration yields `aud=[<MCP URL>, orders]`, so ADR 0005's single two-audience token is impossible.
+- C gets the `orders` scope onto the token, but not the audience. Forwarding that token to Ordering is token passthrough (a token whose audience is eShop.Mcp, sent to another API). ADR 0005 rejected passthrough, and C would only work because ServiceDefaults sets `ValidateAudience = false`.
+- The spec-clean path is B plus a token exchange (RFC 8693): eShop.Mcp swaps the caller's token for one with `aud: orders` and the same `sub`. In Duende that is a custom extension grant (`IExtensionGrantValidator`). This changes ADR 0005 and ticket 03's forwarding.
+- Not checked: whether Duende's license edition covers resource isolation (resource indicators) and token exchange outside development. The prototype ran unlicensed in development mode.
+
+**Replanned (2026-11-04).** The fix is ticket 05, which names Identity.API's resource for eShop.Mcp by its URL. The design is in the rewritten ADR 0005 and spec. With 05, `claude-code` and `vscode` lose the `orders` scope, and the two-audience token in this ticket's description no longer applies: order access goes through token exchange (06, 07). This ticket remains the manual sign-in check. After 05 lands, re-run it with `ESHOP_USE_HTTP_ENDPOINTS=1` and `http://localhost:5229/mcp`: sign in as alice, approve consent, run a catalog search, then reconnect without consent. Then run the VS Code flow and record both unverified assumptions here.
