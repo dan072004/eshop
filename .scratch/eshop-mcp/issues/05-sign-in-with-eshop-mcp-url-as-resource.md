@@ -22,15 +22,21 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `Mcp.FunctionalTests`, with tokens minted for the configured test URL:
-  - [ ] No token → 401 with `resource_metadata`. The metadata's `resource` is exactly the configured URL, also for a request made on another host form. `authorization_servers` is exactly the configured Identity URL. `scopes_supported` is `openid`, `profile`, `offline_access`, `eshop-mcp`
-  - [ ] A token whose audience is `eshop-mcp`, but not the configured URL → 401
-  - [ ] A token whose audience is only `orders` → 401
-  - [ ] Existing cases (expired token, `tools/list`, catalog and policy calls without `Authorization`) pass with the URL audience
-  - [ ] The order-tool cases that relied on `aud: orders` are changed to expect `sign_in_required` with no request to Ordering (07 replaces them)
-- [ ] AppHost unit tests: Identity.API and eShop.Mcp receive the same `EshopMcpUrl`, under both the https profile and `ESHOP_USE_HTTP_ENDPOINTS=1`. This replaces the test removed in `aa8d7c1`
-- [ ] The `claude-code` and `vscode` clients and the `orders` resource are otherwise unchanged. WebApp, MAUI and Webhooks clients are untouched
-- [ ] README updated as above
-- [ ] The spec's "Identity.API does not receive eShop.Mcp's URL" no longer holds anywhere in code or docs
+- [x] `Mcp.FunctionalTests`, with tokens minted for the configured test URL:
+  - [x] No token → 401 with `resource_metadata`. The metadata's `resource` is exactly the configured URL, also for a request made on another host form. `authorization_servers` is exactly the configured Identity URL. `scopes_supported` is `openid`, `profile`, `offline_access`, `eshop-mcp`
+  - [x] A token whose audience is `eshop-mcp`, but not the configured URL → 401
+  - [x] A token whose audience is only `orders` → 401
+  - [x] Existing cases (expired token, `tools/list`, catalog and policy calls without `Authorization`) pass with the URL audience
+  - [x] The order-tool cases that relied on `aud: orders` are changed to expect `sign_in_required` with no request to Ordering (07 replaces them)
+- [x] AppHost unit tests: Identity.API and eShop.Mcp receive the same `EshopMcpUrl`, under both the https profile and `ESHOP_USE_HTTP_ENDPOINTS=1`. This replaces the test removed in `aa8d7c1`
+- [x] The `claude-code` and `vscode` clients and the `orders` resource are otherwise unchanged. WebApp, MAUI and Webhooks clients are untouched
+- [x] README updated as above
+- [x] The spec's "Identity.API does not receive eShop.Mcp's URL" no longer holds anywhere in code or docs
+
+## Comments
+
+- Done (agent). The AppHost passes `EshopMcpUrl` (`{eshop-mcp endpoint of the active profile}/mcp`) to Identity.API and eShop.Mcp, and Identity.API rejoins the reference cycle. Identity.API names eShop.Mcp's resource by that URL, with the scope `eshop-mcp`. `claude-code` and `vscode` lose `orders`. eShop.Mcp validates the URL as audience and advertises it as the metadata `resource`, and `scopes_supported` drops `orders`. The order tools now return `sign_in_required`: one interim test replaces the three forwarding and not-found cases, and 07 restores them. `IdentityConfigurationTests` (Application.UnitTests) had to change because `GetApis` now takes configuration. It also pins the MCP clients' scopes. README: HTTP is the Claude Code path, `NODE_EXTRA_CA_CERTS` is marked unreliable, and warnings about the Cosmos DB Emulator certificate and the Duende licence were added. The main checkout had no uncommitted README change to keep.
+- Security review (security-reviewer agent): no findings. The metadata `resource` no longer reflects the request's Host header, which removes a host-reflection risk. Ordering.API's `ValidateAudience=false` remains the known gap, and this change doesn't make it worse.
+- Manual check (sign in as alice in Claude Code without `invalid_target`) not run here. It belongs to the acceptance pass.

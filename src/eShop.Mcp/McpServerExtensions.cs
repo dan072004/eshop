@@ -9,21 +9,28 @@ namespace eShop.Mcp;
 
 internal static class McpServerExtensions
 {
-    /// <summary>The audience a token must name to be accepted here (ADR 0005).</summary>
-    public const string Audience = "eshop-mcp";
+    /// <summary>
+    /// The setting holding eShop.Mcp's own <c>/mcp</c> URL, from the AppHost. Identity.API names eShop.Mcp's API
+    /// resource with the same value (ADR 0005).
+    /// </summary>
+    public const string McpUrlSetting = "EshopMcpUrl";
 
     public const string McpPath = "/mcp";
 
-    private static readonly string[] ScopesSupported = ["openid", "profile", "offline_access", Audience, "orders"];
+    /// <summary>The scope MCP clients request. Identity.API's eShop.Mcp resource lists it.</summary>
+    private const string Scope = "eshop-mcp";
+
+    private static readonly string[] ScopesSupported = ["openid", "profile", "offline_access", Scope];
 
     /// <summary>
-    /// Buyer sign-in (ADR 0005): JWT bearer against Identity.API, validating the <c>eshop-mcp</c> audience, with the
+    /// Buyer sign-in (ADR 0005): JWT bearer against Identity.API, validating eShop.Mcp's URL as the audience, with the
     /// SDK's MCP handler answering challenges with a pointer to the protected resource metadata (RFC 9728).
     /// Configured here rather than through the shared <c>AddDefaultAuthentication</c>, which turns audience validation off.
     /// </summary>
     public static IHostApplicationBuilder AddBuyerAuthentication(this IHostApplicationBuilder builder)
     {
         var identityUrl = builder.Configuration.GetSection("Identity").GetRequiredValue("Url");
+        var mcpUrl = builder.Configuration.GetRequiredValue(McpUrlSetting);
 
         // Keep "sub" as "sub", as the other services do.
         JsonWebTokenHandler.DefaultInboundClaimTypeMap.Remove("sub");
@@ -37,7 +44,9 @@ internal static class McpServerExtensions
             {
                 options.Authority = identityUrl;
                 options.RequireHttpsMetadata = false;
-                options.Audience = Audience;
+                // A client names eShop.Mcp by this URL as its resource indicator (RFC 8707), and Identity.API then
+                // issues the token for that resource alone.
+                options.Audience = mcpUrl;
                 options.TokenValidationParameters.ValidIssuers = [identityUrl];
                 options.TokenValidationParameters.ValidateAudience = true;
                 // The token-forwarding handler (AddAuthToken) reads the validated token back from the request.
@@ -45,18 +54,14 @@ internal static class McpServerExtensions
             })
             .AddMcp(options =>
             {
+                // "resource" is exactly the configured URL, not derived from the request: it must be the name the
+                // token's audience carries. A client that connected on another host form (127.0.0.1 instead of
+                // localhost) sees the mismatch and refuses before sign-in.
                 options.ResourceMetadata = new()
                 {
+                    Resource = mcpUrl,
                     AuthorizationServers = [identityUrl],
                     ScopesSupported = [.. ScopesSupported],
-                };
-                // "resource" is the MCP endpoint exactly as the client reached it, so the client's check that the
-                // metadata belongs to the server it is talking to passes for localhost and 127.0.0.1 alike.
-                options.Events.OnResourceMetadataRequest = context =>
-                {
-                    var request = context.HttpContext.Request;
-                    context.ResourceMetadata!.Resource = $"{request.Scheme}://{request.Host}{request.PathBase}{McpPath}";
-                    return Task.CompletedTask;
                 };
             });
 

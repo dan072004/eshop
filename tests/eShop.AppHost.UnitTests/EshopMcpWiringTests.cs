@@ -53,6 +53,23 @@ public class EshopMcpWiringTests
         Assert.AreEqual(7229, endpoints.Single(e => e.Name == "https").Port);
     }
 
+    // One value names eShop.Mcp's API resource in Identity.API and is the audience and metadata "resource" eShop.Mcp
+    // uses, so the three can't disagree (ADR 0005). It follows the active launch profile.
+    [TestMethod]
+    [DoNotParallelize]
+    [DataRow(false, "{eshop-mcp.bindings.https.url}/mcp")]
+    [DataRow(true, "{eshop-mcp.bindings.http.url}/mcp")]
+    public async Task IdentityApiAndEshopMcpReceiveTheSameMcpUrl(bool useHttpEndpoints, string expectedUrl)
+    {
+        await using var appHost = await CreateAppHostAsync(useHttpEndpoints);
+
+        var identityEnvironment = await EnvironmentOf(appHost, Resource(appHost, "identity-api"));
+        var mcpEnvironment = await EnvironmentOf(appHost, Resource(appHost, "eshop-mcp"));
+
+        Assert.AreEqual(expectedUrl, identityEnvironment["EshopMcpUrl"]);
+        Assert.AreEqual(expectedUrl, mcpEnvironment["EshopMcpUrl"]);
+    }
+
     [TestMethod]
     [DoNotParallelize]
     public async Task EshopMcpUsesTheHttpProfileWhenHttpEndpointsAreForced()

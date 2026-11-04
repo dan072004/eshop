@@ -3,16 +3,19 @@
     public class Config
     {
         // ApiResources define the apis in your system
-        public static IEnumerable<ApiResource> GetApis()
+        public static IEnumerable<ApiResource> GetApis(IConfiguration configuration)
         {
+            // eShop.Mcp's /mcp URL, from the AppHost. MCP clients name eShop.Mcp by this URL as their resource
+            // indicator (RFC 8707), and eShop.Mcp validates it as the audience (ADR 0005).
+            var eshopMcpUrl = configuration.GetRequiredValue("EshopMcpUrl");
+
             return new List<ApiResource>
             {
                 // Scopes ties the resource to its scope, so a token that requests "orders" names "orders" as an audience.
                 new ApiResource("orders", "Orders Service") { Scopes = { "orders" } },
                 new ApiResource("basket", "Basket Service"),
                 new ApiResource("webhooks", "Webhooks registration Service"),
-                // eShop.Mcp validates this audience (ADR 0005).
-                new ApiResource("eshop-mcp", "AdventureWorks MCP Server") { Scopes = { "eshop-mcp" } },
+                new ApiResource(eshopMcpUrl, "AdventureWorks MCP Server") { Scopes = { "eshop-mcp" } },
             };
         }
 
@@ -214,7 +217,9 @@
         }
 
         // An MCP client (ADR 0005): public (no secret), authorization code with PKCE (S256), consent required and
-        // remembered, offline access with refresh-token rotation. The token names both eshop-mcp and orders as audiences.
+        // remembered, offline access with refresh-token rotation. No "orders": the client names eShop.Mcp's URL as the
+        // resource, so the token's only audience is that URL and "orders" would be dropped from it anyway. eShop.Mcp
+        // gets Ordering's token by exchange instead.
         private static Client McpClient(string clientId, string clientName, ICollection<string> redirectUris) => new()
         {
             ClientId = clientId,
@@ -233,8 +238,7 @@
                 IdentityServerConstants.StandardScopes.OpenId,
                 IdentityServerConstants.StandardScopes.Profile,
                 IdentityServerConstants.StandardScopes.OfflineAccess,
-                "eshop-mcp",
-                "orders"
+                "eshop-mcp"
             },
             AccessTokenLifetime = 60 * 60 * 2, // 2 hours
             IdentityTokenLifetime = 60 * 60 * 2 // 2 hours

@@ -155,30 +155,27 @@ eShop.Mcp (the `eshop-mcp` resource) is an MCP server for local AI clients, at `
 
 Both clients are registered in Identity.API (`src/Identity.API/Configuration/Config.cs`), so neither needs dynamic client registration or a client secret.
 
+Use the server URL exactly as given here, with `localhost`. The client names eShop.Mcp by that URL when it signs in, and Identity.API and eShop.Mcp know it by only that one URL (the AppHost passes it to both as `EshopMcpUrl`). A client configured with `127.0.0.1` instead sees a mismatch and refuses to sign in.
+
+> [!NOTE]
+> The client asks for a token for eShop.Mcp by its URL (an RFC 8707 resource indicator). In Duende IdentityServer that is resource isolation, an Enterprise edition feature. In development Identity.API runs unlicensed in trial mode, which only logs a warning after 500 requests. Outside development, MCP sign-in needs a Duende Enterprise or Community Edition licence.
+
 #### Claude Code
 
-```powershell
-claude mcp add --transport http --client-id claude-code --callback-port 33419 eshop https://localhost:7229/mcp
-```
-
-Then run `/mcp` in Claude Code and choose **Authenticate** for `eshop`. The callback port must match Identity.API's `ClaudeCodeCallbackPort` setting (default `33419`, in `src/Identity.API/appsettings.json`). If that port is taken on your machine, change the setting and pass the same port to `--callback-port`.
-
-Claude Code doesn't trust the .NET development certificate by default, so the HTTPS URL fails with a certificate error. Export the certificate and point `NODE_EXTRA_CA_CERTS` at it before starting Claude Code:
-
-```powershell
-New-Item -ItemType Directory -Force "$HOME/.aspnet" | Out-Null
-dotnet dev-certs https --export-path "$HOME/.aspnet/dev-cert.pem" --format Pem --no-password
-$env:NODE_EXTRA_CA_CERTS = "$HOME/.aspnet/dev-cert.pem"
-claude
-```
-
-If that doesn't work, run eShop over plain HTTP instead and register the HTTP URL:
+Run the whole AppHost over plain HTTP, then register the HTTP URL:
 
 ```powershell
 $env:ESHOP_USE_HTTP_ENDPOINTS = "1"
 aspire run
 claude mcp add --transport http --client-id claude-code --callback-port 33419 eshop http://localhost:5229/mcp
 ```
+
+Then run `/mcp` in Claude Code and choose **Authenticate** for `eshop`. The callback port must match Identity.API's `ClaudeCodeCallbackPort` setting (default `33419`, in `src/Identity.API/appsettings.json`). If that port is taken on your machine, change the setting and pass the same port to `--callback-port`.
+
+Over HTTPS, Claude Code doesn't trust the .NET development certificate. Pointing `NODE_EXTRA_CA_CERTS` at an exported copy of the certificate is unreliable: Claude Code 2.1.286 ignores it when it reconnects, so the connection fails after the first sign-in. Use the HTTP setup above.
+
+> [!WARNING]
+> The Azure Cosmos DB Emulator installs self-signed root certificates with the subject `CN=localhost`. They break trust in the .NET development certificate, which has the same subject. If HTTPS connections to eShop fail with certificate errors and the emulator is installed, remove its certificates from your trusted roots or use the HTTP setup.
 
 #### GitHub Copilot in VS Code
 

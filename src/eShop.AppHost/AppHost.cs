@@ -91,6 +91,11 @@ var eshopMcp = builder.AddDotnetProject("eshop-mcp", "../eShop.Mcp", o => o.Laun
     .WithEnvironment("Identity__Url", identityEndpoint)
     .WithHttpHealthCheck("/health");
 
+// eShop.Mcp's /mcp URL for the active profile: the name of its API resource in Identity.API, and the audience and
+// metadata "resource" eShop.Mcp itself uses (ADR 0005). One value, so they can't disagree.
+var eshopMcpUrl = ReferenceExpression.Create($"{eshopMcp.GetEndpoint(launchProfileName)}/mcp");
+eshopMcp.WithEnvironment("EshopMcpUrl", eshopMcpUrl);
+
 // Set ChatProvider (None, Ollama, Foundry or Claude) and EmbeddingProvider (None, Ollama or Foundry),
 // both default None, to switch on the Shopping Assistant and semantic catalog and Policy search.
 builder.AddChatAndEmbeddingProviders(catalogApi, webApp, policyApi);
@@ -99,12 +104,14 @@ builder.AddChatAndEmbeddingProviders(catalogApi, webApp, policyApi);
 webApp.WithEnvironment("CallBackUrl", webApp.GetEndpoint(launchProfileName));
 webhooksClient.WithEnvironment("CallBackUrl", webhooksClient.GetEndpoint(launchProfileName));
 
-// Identity has a reference to all of the apps for callback urls, this is a cyclic reference
+// Identity has a reference to all of the apps for callback urls (and to eShop.Mcp's URL as a resource name),
+// this is a cyclic reference
 identityApi.WithEnvironment("BasketApiClient", basketApi.GetEndpoint("http"))
            .WithEnvironment("OrderingApiClient", orderingApi.GetEndpoint("http"))
            .WithEnvironment("WebhooksApiClient", webHooksApi.GetEndpoint("http"))
            .WithEnvironment("WebhooksWebClient", webhooksClient.GetEndpoint(launchProfileName))
-           .WithEnvironment("WebAppClient", webApp.GetEndpoint(launchProfileName));
+           .WithEnvironment("WebAppClient", webApp.GetEndpoint(launchProfileName))
+           .WithEnvironment("EshopMcpUrl", eshopMcpUrl);
 
 builder.Build().Run();
 
