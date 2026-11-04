@@ -11,7 +11,8 @@ namespace eShop.Identity.FunctionalTests;
 /// eShop.Mcp exchanges a Buyer's eShop.Mcp token for an Ordering token (RFC 8693, ADR 0005), through the real
 /// <c>/connect/token</c> endpoint, so Duende's pipeline decides what passes.
 /// </summary>
-public sealed class TokenExchangeTests(IdentityApiFixture fixture) : IClassFixture<IdentityApiFixture>
+[Collection(IdentityApiCollection.Name)]
+public sealed class TokenExchangeTests(IdentityApiFixture fixture)
 {
     private const string TokenExchangeGrant = "urn:ietf:params:oauth:grant-type:token-exchange";
     private const string AccessTokenType = "urn:ietf:params:oauth:token-type:access_token";

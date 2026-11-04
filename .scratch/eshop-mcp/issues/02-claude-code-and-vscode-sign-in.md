@@ -109,3 +109,5 @@ Verdict:
   Assumption results: (1) Claude Code's fixed-port loopback redirect works with Duende's exact matching (`--callback-port 33419`). (2) VS Code's redirect URIs are right, but its port is fixed only while 33418 is free, so the fallback validator would make VS Code reliable. ADR 0005 is unchanged because the fallback wasn't built.
 
   The user closed the ticket: sign-in and consent from VS Code worked (see above). No eShop tool call from Copilot was checked, and neither was a VS Code reconnect. The `eshop-mcp` scope and both clients were added in configuration by this ticket with the existing clients unchanged (first comment), and the setup docs are in the README's "Optional: Connect Claude Code or VS Code".
+
+- **`https://vscode.dev/redirect` removed (2026-11-04).** The low finding above said to remove it if VS Code desktop doesn't use it. The failed sign-in above asked for `http://127.0.0.1:62116/`, a loopback redirect, so desktop VS Code signs in through loopback. `vscode` now has only `http://127.0.0.1:33418` and `http://127.0.0.1:33418/`. Not yet checked: a VS Code sign-in after the removal.

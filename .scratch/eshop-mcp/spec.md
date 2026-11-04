@@ -117,7 +117,7 @@ For "what's the return window for my last order?" in Claude Code, on a shipped o
 - The existing `orders` API resource lists `Scopes = { "orders" }`, so a token for the `orders` scope names `orders` as its audience. Side effect: WebApp and MAUI tokens also gain `aud: orders`. That is harmless: it is the audience Ordering.API is configured with.
 - **Public MCP clients**, with no change to existing clients:
   - `claude-code`: public client (no secret), authorization code with PKCE (S256), consent required and remembered, offline access with refresh-token rotation. Redirect URIs `http://localhost:{port}/callback` and `http://127.0.0.1:{port}/callback` on one fixed port.
-  - `vscode`: the same settings, with redirect URIs `http://127.0.0.1:33418`, `http://127.0.0.1:33418/` and `https://vscode.dev/redirect`.
+  - `vscode`: the same settings, with redirect URIs `http://127.0.0.1:33418` and `http://127.0.0.1:33418/`. Not `https://vscode.dev/redirect`: it would let any website start a `vscode` sign-in.
   - Allowed scopes for both: `openid`, `profile`, `offline_access`, `eshop-mcp`. Not `orders`: with a resource indicator it would be dropped from their token anyway.
   - The Claude Code callback port is a setting with a default.
 - **Confidential client `eshop-mcp-server`**:

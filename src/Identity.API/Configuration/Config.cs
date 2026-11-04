@@ -11,10 +11,12 @@
 
             return new List<ApiResource>
             {
-                // Scopes ties the resource to its scope, so a token that requests "orders" names "orders" as an audience.
+                // Scopes ties each resource to its scope, so a token that requests "basket" names "basket" as an audience.
+                // Each API accepts only tokens for its own audience (ServiceDefaults), so the others refuse a token for
+                // one API, and every API refuses the MCP clients' token for eShop.Mcp.
                 new ApiResource("orders", "Orders Service") { Scopes = { "orders" } },
-                new ApiResource("basket", "Basket Service"),
-                new ApiResource("webhooks", "Webhooks registration Service"),
+                new ApiResource("basket", "Basket Service") { Scopes = { "basket" } },
+                new ApiResource("webhooks", "Webhooks registration Service") { Scopes = { "webhooks" } },
                 new ApiResource(eshopMcpUrl, "AdventureWorks MCP Server") { Scopes = { "eshop-mcp" } },
             };
         }
@@ -165,8 +167,9 @@
                     [
                         "http://127.0.0.1:33418",
                         // VS Code's own client registration uses the trailing-slash form, and Duende matches exactly.
-                        "http://127.0.0.1:33418/",
-                        "https://vscode.dev/redirect"
+                        // Loopback only. https://vscode.dev/redirect would let any website start a vscode sign-in
+                        // whose code lands on a page this app doesn't control.
+                        "http://127.0.0.1:33418/"
                     ]),
                 // eShop.Mcp exchanges a Buyer's eShop.Mcp token for a short-lived Ordering token, and nothing else
                 // (ADR 0005, TokenExchangeGrantValidator).

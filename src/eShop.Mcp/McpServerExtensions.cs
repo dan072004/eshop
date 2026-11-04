@@ -24,7 +24,8 @@ internal static class McpServerExtensions
     /// <summary>
     /// Buyer sign-in (ADR 0005): JWT bearer against Identity.API, validating eShop.Mcp's URL as the audience, with the
     /// SDK's MCP handler answering challenges with a pointer to the protected resource metadata (RFC 9728).
-    /// Configured here rather than through the shared <c>AddDefaultAuthentication</c>, which turns audience validation off.
+    /// Configured here rather than through the shared <c>AddDefaultAuthentication</c>, whose audience comes from
+    /// <c>Identity:Audience</c> rather than EshopMcpUrl, and which has no MCP challenge handler.
     /// </summary>
     public static IHostApplicationBuilder AddBuyerAuthentication(this IHostApplicationBuilder builder)
     {

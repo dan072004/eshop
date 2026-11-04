@@ -6,8 +6,10 @@ using Microsoft.Extensions.Hosting;
 
 namespace eShop.Ordering.FunctionalTests;
 
-public sealed class OrderingApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
+public class OrderingApiFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    public const string IdentityUrl = "http://identity-api.invalid";
+
     private readonly IHost _app;
 
     public IResourceBuilder<PostgresServerResource> Postgres { get; private set; }
@@ -29,16 +31,19 @@ public sealed class OrderingApiFixture : WebApplicationFactory<Program>, IAsyncL
             config.AddInMemoryCollection(new Dictionary<string, string>
             {
                 { $"ConnectionStrings:{Postgres.Resource.Name}", _postgresConnectionString },
-                // Ordering.API needs an Identity URL to configure JWT bearer auth. AutoAuthorizeMiddleware
-                // signs every request in, so the URL is never called and the fixture runs no Identity API.
-                { "Identity:Url", "http://identity-api.invalid" }
+                // Ordering.API needs an Identity URL to configure JWT bearer auth. The URL is never called and the
+                // fixture runs no Identity API (see ConfigureAuthentication).
+                { "Identity:Url", IdentityUrl }
             });
         });
-        builder.ConfigureServices(services =>
-        {
-            services.AddSingleton<IStartupFilter>(new AutoAuthorizeStartupFilter());
-        });
+        builder.ConfigureServices(ConfigureAuthentication);
         return base.CreateHost(builder);
+    }
+
+    /// <summary>AutoAuthorizeMiddleware signs every request in as <see cref="AutoAuthorizeMiddleware.IDENTITY_ID"/>.</summary>
+    protected virtual void ConfigureAuthentication(IServiceCollection services)
+    {
+        services.AddSingleton<IStartupFilter>(new AutoAuthorizeStartupFilter());
     }
 
     public new async Task DisposeAsync()
