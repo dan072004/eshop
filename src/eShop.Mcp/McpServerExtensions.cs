@@ -1,5 +1,4 @@
 ﻿using eShop.Assistant.Tools;
-using eShop.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.JsonWebTokens;
 using ModelContextProtocol.AspNetCore.Authentication;
@@ -49,7 +48,7 @@ internal static class McpServerExtensions
                 options.Audience = mcpUrl;
                 options.TokenValidationParameters.ValidIssuers = [identityUrl];
                 options.TokenValidationParameters.ValidateAudience = true;
-                // The token-forwarding handler (AddAuthToken) reads the validated token back from the request.
+                // The token-exchange handler reads the validated token back from the request.
                 options.SaveToken = true;
             })
             .AddMcp(options =>
@@ -76,13 +75,15 @@ internal static class McpServerExtensions
     /// </summary>
     public static IHostApplicationBuilder AddEshopMcpServer(this IHostApplicationBuilder builder)
     {
-        // Only Ordering needs the Buyer: it gets the caller's own validated token, read back from this request, and
-        // only if that token names the "orders" audience. The policy and catalog clients send no token.
-        // Ordering.API keeps the ownership check.
-        builder.Services.AddTransient<OrdersAudienceHandler>();
+        // Only Ordering needs the Buyer: on every request the caller's validated token is exchanged at Identity.API
+        // for an Ordering token, and only that is sent (no passthrough, ADR 0005). The policy and catalog clients send
+        // no token. Ordering.API keeps the ownership check.
+        var identityUrl = builder.Configuration.GetSection("Identity").GetRequiredValue("Url");
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.AddHttpClient<TokenExchangeClient>(client => client.BaseAddress = new($"{identityUrl.TrimEnd('/')}/"));
+        builder.Services.AddTransient<OrdersTokenExchangeHandler>();
         builder.Services.AddAssistantTools().OrderingClient
-            .AddHttpMessageHandler<OrdersAudienceHandler>()
-            .AddAuthToken();
+            .AddHttpMessageHandler<OrdersTokenExchangeHandler>();
 
         builder.Services.AddMcpServer()
             .WithHttpTransport(options =>

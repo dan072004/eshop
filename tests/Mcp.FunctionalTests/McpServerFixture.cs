@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Net;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using eShop.Assistant.Tools.Catalog;
@@ -9,7 +10,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
@@ -21,7 +24,8 @@ namespace eShop.Mcp.FunctionalTests;
 /// a real Buyer token needs the interactive code flow, and a password grant only for tests would change an existing
 /// service. So the token issuer is faked, as the spec's Testing Decisions say: JWT validation trusts a test signing key
 /// and tests mint their own Buyer tokens. eShop.Mcp has no database or event bus, and the outbound handlers behind the
-/// policy-api, Catalog and Ordering clients are faked.
+/// policy-api, Catalog and Ordering clients are faked. So is Identity.API's token endpoint, which eShop.Mcp calls to
+/// exchange the Buyer's token for an Ordering token; the real grant is tested in Identity.FunctionalTests.
 /// </summary>
 public sealed class McpServerFixture : WebApplicationFactory<Program>
 {
@@ -32,6 +36,7 @@ public sealed class McpServerFixture : WebApplicationFactory<Program>
     public const string PolicyUrl = "http://policy.test";
     public const string CatalogUrl = "http://catalog.test";
     public const string OrderingUrl = "http://ordering.test";
+    public const string EshopMcpServerSecret = "test-eshop-mcp-server-secret";
 
     private readonly RsaSecurityKey _signingKey = new(RSA.Create(2048)) { KeyId = "test-key" };
 
@@ -41,10 +46,17 @@ public sealed class McpServerFixture : WebApplicationFactory<Program>
 
     public RecordingHandler Ordering { get; } = new();
 
+    /// <summary>
+    /// Identity.API's token endpoint. By default it grants every exchange, issuing <see cref="ExchangedToken"/> for
+    /// the subject token.
+    /// </summary>
+    public RecordingHandler Identity { get; } = new() { Respond = GrantExchange };
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("Identity:Url", IdentityUrl);
         builder.UseSetting("EshopMcpUrl", McpUrl);
+        builder.UseSetting("EshopMcpServerSecret", EshopMcpServerSecret);
         builder.UseSetting("services:policy-api:http:0", PolicyUrl);
         builder.UseSetting("services:catalog-api:http:0", CatalogUrl);
         builder.UseSetting("services:ordering-api:http:0", OrderingUrl);
@@ -63,7 +75,31 @@ public sealed class McpServerFixture : WebApplicationFactory<Program>
             services.AddHttpClient<PolicyClient>().ConfigurePrimaryHttpMessageHandler(() => Policy);
             services.AddHttpClient<CatalogClient>().ConfigurePrimaryHttpMessageHandler(() => Catalog);
             services.AddHttpClient<OrderingClient>().ConfigurePrimaryHttpMessageHandler(() => Ordering);
+            services.AddHttpClient<TokenExchangeClient>().ConfigurePrimaryHttpMessageHandler(() => Identity);
+            // ServiceDefaults adds one standard resilience handler to every client, under the options name "-standard".
+            // Without its back-off, a failing token endpoint fails the call in milliseconds rather than half a minute.
+            services.Configure<HttpStandardResilienceOptions>("-standard", options => options.Retry.Delay = TimeSpan.Zero);
         });
+    }
+
+    /// <summary>The Ordering token the fake token endpoint issues for a subject token, a different one for each.</summary>
+    public static string ExchangedToken(string subjectToken) =>
+        "orders-token-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(subjectToken)))[..16];
+
+    public static HttpResponseMessage GrantExchange(HttpRequestMessage request)
+    {
+        var subjectToken = RecordingHandler.ParseForm(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult())["subject_token"];
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(new
+            {
+                access_token = ExchangedToken(subjectToken),
+                issued_token_type = "urn:ietf:params:oauth:token-type:access_token",
+                token_type = "Bearer",
+                expires_in = 300,
+                scope = "orders",
+            }),
+        };
     }
 
     /// <summary>
@@ -104,14 +140,29 @@ public sealed class RecordingHandler : HttpMessageHandler
 
     public void Reset() => _requests.Clear();
 
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        _requests.Enqueue(new RecordedRequest(request.RequestUri!, request.Headers.Authorization?.ToString()));
-        return Task.FromResult(Respond(request));
+        // Buffered, so the body can be both recorded and read again by Respond.
+        string? body = null;
+        if (request.Content is not null)
+        {
+            await request.Content.LoadIntoBufferAsync(cancellationToken);
+            body = await request.Content.ReadAsStringAsync(cancellationToken);
+        }
+
+        _requests.Enqueue(new RecordedRequest(request.Method, request.RequestUri!, request.Headers.Authorization?.ToString(), body));
+        return Respond(request);
     }
 
     public static HttpResponseMessage Json(string body) =>
         new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
+
+    /// <summary>An <c>application/x-www-form-urlencoded</c> body as name/value pairs.</summary>
+    public static Dictionary<string, string> ParseForm(string body) =>
+        QueryHelpers.ParseQuery(body).ToDictionary(p => p.Key, p => p.Value.ToString());
 }
 
-public sealed record RecordedRequest(Uri Uri, string? Authorization);
+public sealed record RecordedRequest(HttpMethod Method, Uri Uri, string? Authorization, string? Body)
+{
+    public Dictionary<string, string> Form => RecordingHandler.ParseForm(Body ?? "");
+}

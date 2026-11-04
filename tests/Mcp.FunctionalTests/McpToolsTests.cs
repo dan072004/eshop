@@ -1,4 +1,6 @@
-﻿using System.Text.Json;
+﻿using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 using eShop.Assistant.Tools;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Client;
@@ -29,6 +31,11 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
             }
           ]
         }
+        """;
+
+    // What Ordering.API v1 returns from orders/{orderId}. No items, so get_order makes no Catalog lookups.
+    private const string OrderWithoutItems = """
+        { "orderNumber": 17, "date": "2026-10-01T09:30:00Z", "status": "Paid", "orderItems": [] }
         """;
 
     [Fact]
@@ -68,9 +75,9 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
     }
 
     [Fact]
-    public async Task SearchCatalogReachesCatalogWithoutTheBuyersTokenAndLeavesPictureUrlOut()
+    public async Task SearchCatalogReachesCatalogWithoutTheBuyersTokenOrAnExchangeAndLeavesPictureUrlOut()
     {
-        fixture.Catalog.Reset();
+        ResetBackends();
         fixture.Catalog.Respond = _ => RecordingHandler.Json(CatalogPage);
         await using var client = await ConnectAsBuyerAsync("alice");
 
@@ -84,6 +91,7 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
         Assert.Equal("/api/catalog/items/withsemanticrelevance", request.Uri.AbsolutePath);
         Assert.Contains("text=tent%20for%20trekking", request.Uri.Query);
         Assert.Null(request.Authorization);
+        Assert.Empty(fixture.Identity.Requests);
 
         Assert.NotEqual(true, result.IsError);
         Assert.Null(result.StructuredContent);
@@ -95,34 +103,136 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
         Assert.False(item.TryGetProperty("pictureUrl", out _));
     }
 
-    // Interim until ticket 07: the Buyer's token names only eShop.Mcp's URL, so the order tools have no token Ordering
-    // may receive and ask the Buyer to sign in, without forwarding the caller's token (no passthrough, ADR 0005).
+    // No passthrough (ADR 0005): Ordering only ever sees the token Identity.API issued for it in exchange.
     [Fact]
-    public async Task OrderToolsAskTheBuyerToSignInAndNothingReachesOrdering()
+    public async Task GetOrderExchangesTheBuyersTokenAndReachesOrderingWithOnlyTheExchangedToken()
     {
-        fixture.Ordering.Reset();
-        fixture.Ordering.Respond = _ => RecordingHandler.Json("[]");
-        await using var client = await ConnectAsBuyerAsync("alice");
+        ResetBackends();
+        fixture.Ordering.Respond = _ => RecordingHandler.Json(OrderWithoutItems);
+        var aliceToken = fixture.MintToken("alice");
+        await using var client = await ConnectAsync(new BearerHandler { Token = aliceToken });
 
-        var listed = await client.CallToolAsync("list_my_orders", cancellationToken: TestContext.Current.CancellationToken);
-        var got = await client.CallToolAsync(
+        var result = await client.CallToolAsync(
             "get_order",
             new Dictionary<string, object?> { ["orderNumber"] = 17 },
             cancellationToken: TestContext.Current.CancellationToken);
 
-        Assert.Empty(fixture.Ordering.Requests);
-        foreach (var result in new[] { listed, got })
-        {
-            var text = Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text;
-            using var json = JsonDocument.Parse(text);
-            Assert.Equal("sign_in_required", json.RootElement.GetProperty("error").GetString());
-        }
+        Assert.NotEqual(true, result.IsError);
+        var exchange = Assert.Single(fixture.Identity.Requests);
+        Assert.Equal((HttpMethod.Post, "http://identity.test/connect/token"), (exchange.Method, exchange.Uri.ToString()));
+        Assert.Equal(
+            new Dictionary<string, string>
+            {
+                ["grant_type"] = "urn:ietf:params:oauth:grant-type:token-exchange",
+                ["subject_token"] = aliceToken,
+                ["subject_token_type"] = "urn:ietf:params:oauth:token-type:access_token",
+                ["scope"] = "orders",
+                ["client_id"] = "eshop-mcp-server",
+                ["client_secret"] = McpServerFixture.EshopMcpServerSecret,
+            },
+            exchange.Form);
+        Assert.Null(exchange.Authorization);
+        var request = Assert.Single(fixture.Ordering.Requests);
+        Assert.Equal("http://ordering.test/api/orders/17", request.Uri.GetLeftPart(UriPartial.Path));
+        Assert.Equal($"Bearer {McpServerFixture.ExchangedToken(aliceToken)}", request.Authorization);
     }
 
     [Fact]
-    public async Task SearchPoliciesReachesPolicyApiWithoutTheBuyersToken()
+    public async Task CallsWithTwoBuyersTokensOnOneClientEachReachOrderingWithTheirOwnExchangedToken()
     {
-        fixture.Policy.Reset();
+        ResetBackends();
+        fixture.Ordering.Respond = _ => RecordingHandler.Json("[]");
+        var aliceToken = fixture.MintToken("alice");
+        var bobToken = fixture.MintToken("bob");
+        var bearer = new BearerHandler { Token = aliceToken };
+        await using var client = await ConnectAsync(bearer);
+
+        var asAlice = await client.CallToolAsync("list_my_orders", cancellationToken: TestContext.Current.CancellationToken);
+        bearer.Token = bobToken;
+        var asBob = await client.CallToolAsync("list_my_orders", cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.NotEqual(true, asAlice.IsError);
+        Assert.NotEqual(true, asBob.IsError);
+        Assert.Equal([aliceToken, bobToken], fixture.Identity.Requests.Select(r => r.Form["subject_token"]));
+        Assert.Equal(
+            [$"Bearer {McpServerFixture.ExchangedToken(aliceToken)}", $"Bearer {McpServerFixture.ExchangedToken(bobToken)}"],
+            fixture.Ordering.Requests.Select(r => r.Authorization));
+    }
+
+    // Nothing is cached (ADR 0005): no exchanged token outlives the tool call that asked for it.
+    [Fact]
+    public async Task TwoOrderToolCallsWithTheSameTokenExchangeItTwice()
+    {
+        ResetBackends();
+        fixture.Ordering.Respond = _ => RecordingHandler.Json("[]");
+        var aliceToken = fixture.MintToken("alice");
+        await using var client = await ConnectAsync(new BearerHandler { Token = aliceToken });
+
+        await client.CallToolAsync("list_my_orders", cancellationToken: TestContext.Current.CancellationToken);
+        await client.CallToolAsync("list_my_orders", cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal([aliceToken, aliceToken], fixture.Identity.Requests.Select(r => r.Form["subject_token"]));
+        Assert.Equal(2, fixture.Ordering.Requests.Count);
+    }
+
+    [Fact]
+    public async Task ARefusedExchangeMakesTheOrderToolsAskTheBuyerToSignInAndNothingReachesOrdering()
+    {
+        ResetBackends();
+        fixture.Identity.Respond = _ => new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = JsonContent.Create(new { error = "invalid_grant" }),
+        };
+        fixture.Ordering.Respond = _ => RecordingHandler.Json("[]");
+        await using var client = await ConnectAsBuyerAsync("alice");
+
+        var errors = await CallOrderToolsAsync(client);
+
+        Assert.Equal(["sign_in_required", "sign_in_required"], errors);
+        Assert.Equal(2, fixture.Identity.Requests.Count);
+        Assert.Empty(fixture.Ordering.Requests);
+    }
+
+    public static TheoryData<string> IdentityFailures => ["unreachable", "5xx"];
+
+    [Theory]
+    [MemberData(nameof(IdentityFailures))]
+    public async Task AFailingTokenEndpointMakesTheOrderToolsUnavailableAndNothingReachesOrdering(string failure)
+    {
+        ResetBackends();
+        fixture.Identity.Respond = failure == "unreachable"
+            ? _ => throw new HttpRequestException("Connection refused")
+            : _ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+        fixture.Ordering.Respond = _ => RecordingHandler.Json("[]");
+        await using var client = await ConnectAsBuyerAsync("alice");
+
+        var errors = await CallOrderToolsAsync(client);
+
+        Assert.Equal(["unavailable", "unavailable"], errors);
+        Assert.NotEmpty(fixture.Identity.Requests);
+        Assert.Empty(fixture.Ordering.Requests);
+    }
+
+    [Fact]
+    public async Task OrderingsNotFoundComesBackAsTheNotFoundErrorResult()
+    {
+        ResetBackends();
+        fixture.Ordering.Respond = _ => new HttpResponseMessage(HttpStatusCode.NotFound);
+        await using var client = await ConnectAsBuyerAsync("alice");
+
+        var result = await client.CallToolAsync(
+            "get_order",
+            new Dictionary<string, object?> { ["orderNumber"] = 99 },
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Single(fixture.Ordering.Requests);
+        Assert.Equal("not_found", ErrorOf(result));
+    }
+
+    [Fact]
+    public async Task SearchPoliciesReachesPolicyApiWithoutTheBuyersTokenOrAnExchange()
+    {
+        ResetBackends();
         fixture.Policy.Respond = _ => RecordingHandler.Json("""{ "mode": "keyword", "results": [] }""");
         await using var client = await ConnectAsBuyerAsync("alice");
 
@@ -136,6 +246,7 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
         Assert.Equal("policy.test", request.Uri.Host);
         Assert.Equal("/api/policies/search", request.Uri.AbsolutePath);
         Assert.Null(request.Authorization);
+        Assert.Empty(fixture.Identity.Requests);
     }
 
     // A client whose Authorization header comes from the handler, so a test can switch Buyers between calls on one
@@ -164,6 +275,33 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
             request.Headers.Authorization = new("Bearer", Token);
             return base.SendAsync(request, cancellationToken);
         }
+    }
+
+    private void ResetBackends()
+    {
+        fixture.Policy.Reset();
+        fixture.Catalog.Reset();
+        fixture.Ordering.Reset();
+        fixture.Identity.Reset();
+        fixture.Identity.Respond = McpServerFixture.GrantExchange;
+    }
+
+    // The error code each order tool returns, list_my_orders first.
+    private static async Task<string[]> CallOrderToolsAsync(McpClient client)
+    {
+        var listed = await client.CallToolAsync("list_my_orders", cancellationToken: TestContext.Current.CancellationToken);
+        var got = await client.CallToolAsync(
+            "get_order",
+            new Dictionary<string, object?> { ["orderNumber"] = 17 },
+            cancellationToken: TestContext.Current.CancellationToken);
+        return [ErrorOf(listed), ErrorOf(got)];
+    }
+
+    private static string ErrorOf(CallToolResult result)
+    {
+        var text = Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text;
+        using var json = JsonDocument.Parse(text);
+        return json.RootElement.GetProperty("error").GetString()!;
     }
 
     private Task<McpClient> ConnectAsBuyerAsync(string subject) =>
