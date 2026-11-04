@@ -38,6 +38,9 @@ public sealed class McpServerFixture : WebApplicationFactory<Program>
     public const string OrderingUrl = "http://ordering.test";
     public const string EshopMcpServerSecret = "test-eshop-mcp-server-secret";
 
+    /// <summary>How long one attempt of any outbound call may take before its resilience pipeline cancels it.</summary>
+    public static readonly TimeSpan AttemptTimeout = TimeSpan.FromSeconds(1);
+
     private readonly RsaSecurityKey _signingKey = new(RSA.Create(2048)) { KeyId = "test-key" };
 
     public RecordingHandler Policy { get; } = new();
@@ -77,8 +80,13 @@ public sealed class McpServerFixture : WebApplicationFactory<Program>
             services.AddHttpClient<OrderingClient>().ConfigurePrimaryHttpMessageHandler(() => Ordering);
             services.AddHttpClient<TokenExchangeClient>().ConfigurePrimaryHttpMessageHandler(() => Identity);
             // ServiceDefaults adds one standard resilience handler to every client, under the options name "-standard".
-            // Without its back-off, a failing token endpoint fails the call in milliseconds rather than half a minute.
-            services.Configure<HttpStandardResilienceOptions>("-standard", options => options.Retry.Delay = TimeSpan.Zero);
+            // Its retries and attempt timeout stay on, so a test sees how often a failing backend is called. Only the
+            // back-off is removed and the attempt timeout shortened (the fakes answer at once), to keep the suite fast.
+            services.Configure<HttpStandardResilienceOptions>("-standard", options =>
+            {
+                options.Retry.Delay = TimeSpan.Zero;
+                options.AttemptTimeout.Timeout = AttemptTimeout;
+            });
         });
     }
 
@@ -136,6 +144,9 @@ public sealed class RecordingHandler : HttpMessageHandler
     public Func<HttpRequestMessage, HttpResponseMessage> Respond { get; set; } =
         _ => new HttpResponseMessage(HttpStatusCode.NotFound);
 
+    /// <summary>When set, the backend never answers: each request waits until it is cancelled.</summary>
+    public bool Hangs { get; set; }
+
     public IReadOnlyList<RecordedRequest> Requests => [.. _requests];
 
     public void Reset() => _requests.Clear();
@@ -151,6 +162,11 @@ public sealed class RecordingHandler : HttpMessageHandler
         }
 
         _requests.Enqueue(new RecordedRequest(request.Method, request.RequestUri!, request.Headers.Authorization?.ToString(), body));
+        if (Hangs)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+        }
+
         return Respond(request);
     }
 

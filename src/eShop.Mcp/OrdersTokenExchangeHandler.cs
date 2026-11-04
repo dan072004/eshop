@@ -21,9 +21,19 @@ internal sealed class OrdersTokenExchangeHandler(IHttpContextAccessor httpContex
             ? await context.GetTokenAsync("access_token")
             : null;
 
-        var ordersToken = callerToken is null
-            ? null
-            : await tokenExchange.ExchangeForOrdersTokenAsync(callerToken, cancellationToken);
+        string? ordersToken;
+        try
+        {
+            ordersToken = callerToken is null
+                ? null
+                : await tokenExchange.ExchangeForOrdersTokenAsync(callerToken, cancellationToken);
+        }
+        catch (OperationCanceledException e) when (httpContextAccessor.HttpContext?.RequestAborted.IsCancellationRequested == false)
+        {
+            // The caller is still waiting, so the Ordering pipeline's attempt timeout cancelled the exchange. Left as a
+            // cancellation, it would become a TimeoutRejectedException, which that pipeline retries.
+            throw new TokenExchangeUnavailableException("The token exchange with Identity.API timed out.", e);
+        }
 
         if (ordersToken is null)
         {

@@ -62,9 +62,9 @@ public sealed class TokenExchangeClient(HttpClient httpClient, IConfiguration co
 }
 
 /// <summary>
-/// Identity.API could not exchange the token (unreachable, 5xx, or an unreadable answer). Deliberately not an
-/// <see cref="HttpRequestException"/>: the token client has already retried, so the Ordering client's resilience
-/// pipeline must not retry the exchange again. The order tools return it as <c>unavailable</c>.
+/// Identity.API could not exchange the token (unreachable, 5xx, timed out, or an unreadable answer). Deliberately not an
+/// <see cref="HttpRequestException"/>, so the Ordering client's resilience pipeline, which the exchange runs inside,
+/// does not retry it: the order tools return <c>unavailable</c> after one exchange.
 /// </summary>
 public sealed class TokenExchangeUnavailableException(string message, Exception? innerException)
     : Exception(message, innerException);

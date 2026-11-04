@@ -193,23 +193,27 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
         Assert.Empty(fixture.Ordering.Requests);
     }
 
-    public static TheoryData<string> IdentityFailures => ["unreachable", "5xx"];
+    public static TheoryData<string> IdentityFailures => ["unreachable", "5xx", "hangs"];
 
+    // However Identity.API fails, each tool call asks it once and answers promptly: the exchange is retried neither by
+    // the token client nor by the Ordering client's resilience pipeline it runs inside, whose attempt timeout cuts off
+    // a hanging token endpoint.
     [Theory]
     [MemberData(nameof(IdentityFailures))]
-    public async Task AFailingTokenEndpointMakesTheOrderToolsUnavailableAndNothingReachesOrdering(string failure)
+    public async Task AFailingTokenEndpointIsAskedOnceAndTheOrderToolsAreUnavailableWithNothingReachingOrdering(string failure)
     {
         ResetBackends();
         fixture.Identity.Respond = failure == "unreachable"
             ? _ => throw new HttpRequestException("Connection refused")
             : _ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+        fixture.Identity.Hangs = failure == "hangs";
         fixture.Ordering.Respond = _ => RecordingHandler.Json("[]");
         await using var client = await ConnectAsBuyerAsync("alice");
 
         var errors = await CallOrderToolsAsync(client);
 
         Assert.Equal(["unavailable", "unavailable"], errors);
-        Assert.NotEmpty(fixture.Identity.Requests);
+        Assert.Equal(2, fixture.Identity.Requests.Count);
         Assert.Empty(fixture.Ordering.Requests);
     }
 
@@ -284,6 +288,7 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
         fixture.Ordering.Reset();
         fixture.Identity.Reset();
         fixture.Identity.Respond = McpServerFixture.GrantExchange;
+        fixture.Identity.Hangs = false;
     }
 
     // The error code each order tool returns, list_my_orders first.

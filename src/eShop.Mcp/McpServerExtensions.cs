@@ -80,7 +80,14 @@ internal static class McpServerExtensions
         // no token. Ordering.API keeps the ownership check.
         var identityUrl = builder.Configuration.GetSection("Identity").GetRequiredValue("Url");
         builder.Services.AddHttpContextAccessor();
-        builder.Services.AddHttpClient<TokenExchangeClient>(client => client.BaseAddress = new($"{identityUrl.TrimEnd('/')}/"));
+        // The exchange runs inside the Ordering client's standard resilience handler, whose attempt timeout bounds it.
+        // A pipeline of its own would retry for longer than that attempt (back-off of 2, 4 and 8 s), the attempt would
+        // time out, and Ordering's pipeline would retry the whole exchange. So each Ordering attempt makes exactly one
+        // exchange, and a failed exchange is not retried (OrdersTokenExchangeHandler).
+#pragma warning disable EXTEXP0001 // Experimental, but the supported way to drop the handler added by ConfigureHttpClientDefaults.
+        builder.Services.AddHttpClient<TokenExchangeClient>(client => client.BaseAddress = new($"{identityUrl.TrimEnd('/')}/"))
+            .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
         builder.Services.AddTransient<OrdersTokenExchangeHandler>();
         builder.Services.AddAssistantTools().OrderingClient
             .AddHttpMessageHandler<OrdersTokenExchangeHandler>();
