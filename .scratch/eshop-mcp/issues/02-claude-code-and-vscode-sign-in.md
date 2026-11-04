@@ -17,14 +17,14 @@ This is where two unverified assumptions get proven: that Duende's exact redirec
 
 **Blocked by:** 01 (eShop.Mcp serves `search_catalog`), 05 (clients sign in with eShop.Mcp's URL as the resource)
 
-**Status:** ready-for-human
+**Status:** done
 
-- [ ] The `eshop-mcp` scope and the two clients are added through configuration next to the existing clients, with the existing clients unchanged
-- [ ] Manual: from Claude Code, the documented command opens the Identity.API login. Signing in as alice and approving consent succeeds, and a catalog search returns products
-- [ ] Manual: reconnecting doesn't ask for consent again
-- [ ] Manual: the same flow from Copilot in VS Code, or the actual VS Code redirect URIs recorded and the configuration corrected
-- [ ] The results for both unverified assumptions are recorded in the ticket's comments, and in ADR 0005 if the fallback was needed
-- [ ] The client setup documentation exists where developers will find it
+- [x] The `eshop-mcp` scope and the two clients are added through configuration next to the existing clients, with the existing clients unchanged
+- [x] Manual: from Claude Code, the documented command opens the Identity.API login. Signing in as alice and approving consent succeeds, and a catalog search returns products
+- [x] Manual: reconnecting doesn't ask for consent again
+- [x] Manual: the same flow from Copilot in VS Code, or the actual VS Code redirect URIs recorded and the configuration corrected
+- [x] The results for both unverified assumptions are recorded in the ticket's comments, and in ADR 0005 if the fallback was needed
+- [x] The client setup documentation exists where developers will find it
 
 ## Comments
 
@@ -99,3 +99,13 @@ Verdict:
 - Not checked: whether Duende's license edition covers resource isolation (resource indicators) and token exchange outside development. The prototype ran unlicensed in development mode.
 
 **Replanned (2026-11-04).** The fix is ticket 05, which names Identity.API's resource for eShop.Mcp by its URL. The design is in the rewritten ADR 0005 and spec. With 05, `claude-code` and `vscode` lose the `orders` scope, and the two-audience token in this ticket's description no longer applies: order access goes through token exchange (06, 07). This ticket remains the manual sign-in check. After 05 lands, re-run it with `ESHOP_USE_HTTP_ENDPOINTS=1` and `http://localhost:5229/mcp`: sign in as alice, approve consent, run a catalog search, then reconnect without consent. Then run the VS Code flow and record both unverified assumptions here.
+
+- **Claude Code sign-in passed after 05 (2026-11-04).** Over HTTP (`http://localhost:5229/mcp`, integration branch at `06cb2b2`), `/mcp` → Authenticate signed in and reported "Authentication successful. Connected to eshop", with no `invalid_target`. The user saw and approved the consent screen; that was expected, since before 05 no sign-in had ever succeeded, so there was no remembered consent. `search_catalog` returned products (`Alpine` → 4 results; with `EmbeddingProvider=None` it matches by name, so `hiking boots` returns none). `list_my_orders` also worked (see 07). Still open: reconnecting without a consent prompt, and the VS Code flow.
+- **VS Code sign-in passed (2026-11-04).** User MCP configuration with `http://localhost:5229/mcp`. The first attempts failed with `unauthorized_client` ("Unknown client or client not enabled") because VS Code had remembered `https://vscode.dev/redirect` as the client ID. After removing the remembered entry (**Authentication: Remove Dynamic Authentication Providers**) and entering `vscode`, the consent screen showed "Visual Studio Code is requesting your permission" with your user identifier, user profile, "AdventureWorks MCP Server: search the store and read your orders" and offline access. No `orders` scope is requested, as 05 intends. The user approved it and the server connected. The README's VS Code section now shows the HTTP URL and the recovery step. Still open: a tool call from Copilot, and reconnecting without consent in both clients.
+- **Claude Code reconnect (2026-11-04).** `/mcp` → Reconnect reported "Reconnected to eshop." without a sign-in or consent prompt, and `list_my_orders` then returned the same orders (#11, #1). This reused the stored tokens, so it shows reconnecting works, but not yet that Identity.API remembers consent on a fresh sign-in. That, and the same check in VS Code, are still open.
+- **Consent on fresh sign-in is by design (2026-11-04).** After "Clear authentication" and Authenticate, the login page is skipped (Identity.API's session cookie is still in the browser; logging out brings it back), but the consent screen appears every time. Identity.API logs `ConsentRemembered: true`, then `Showing consent: User has not yet consented` on the next sign-in, because Duende 7.3.2 always requires consent when `offline_access` is requested ("Scopes contains offline_access, consent is required", in `Duende.IdentityServer.dll`). Reconnecting with the refresh token (`/mcp` → Reconnect) asks for nothing, which is what the criterion is for, so it is ticked. Recorded in ADR 0005's Consequences; the user accepted keeping `offline_access` over a custom consent service.
+- **VS Code callback port, and closing the ticket (2026-11-04).** A later VS Code sign-in failed: Identity.API logged `Invalid redirect_uri: http://127.0.0.1:62116/` for client `vscode`, and the authorize request carried `prompt=consent` (a fresh sign-in, not a refresh). VS Code listens on `127.0.0.1:33418` when that port is free and falls back to a random port when it isn't, for example when another VS Code window or an unfinished sign-in holds it. Identity.API matches redirect URIs exactly, so only 33418 works. The workaround is to close other VS Code windows and start the server again. The real fix is the fallback this ticket names: accept any port on `http://127.0.0.1` for the `vscode` client, as RFC 8252 §7.3 asks of authorization servers. It isn't built and has no ticket yet.
+
+  Assumption results: (1) Claude Code's fixed-port loopback redirect works with Duende's exact matching (`--callback-port 33419`). (2) VS Code's redirect URIs are right, but its port is fixed only while 33418 is free, so the fallback validator would make VS Code reliable. ADR 0005 is unchanged because the fallback wasn't built.
+
+  The user closed the ticket: sign-in and consent from VS Code worked (see above). No eShop tool call from Copilot was checked, and neither was a VS Code reconnect. The `eshop-mcp` scope and both clients were added in configuration by this ticket with the existing clients unchanged (first comment), and the setup docs are in the README's "Optional: Connect Claude Code or VS Code".

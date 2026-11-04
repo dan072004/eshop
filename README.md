@@ -179,20 +179,20 @@ Over HTTPS, Claude Code doesn't trust the .NET development certificate. Pointing
 
 #### GitHub Copilot in VS Code
 
-Add the server to `.vscode/mcp.json` (or your user MCP configuration):
+Add the server to `.vscode/mcp.json` (or your user MCP configuration), using the URL for the way the AppHost runs: `http://localhost:5229/mcp` with `ESHOP_USE_HTTP_ENDPOINTS=1`, as for Claude Code, or `https://localhost:7229/mcp` without it.
 
 ```json
 {
   "servers": {
     "eshop": {
       "type": "http",
-      "url": "https://localhost:7229/mcp"
+      "url": "http://localhost:5229/mcp"
     }
   }
 }
 ```
 
-Start the server from the file. Identity.API offers no dynamic client registration, so VS Code asks for a client ID: enter `vscode` and leave the client secret empty. VS Code trusts the development certificate once `dotnet dev-certs https --trust` has run. VS Code must receive the sign-in on port `33418`, so close other VS Code windows that are signing in to an MCP server at the same time.
+Start the server from the file. Identity.API offers no dynamic client registration, so VS Code asks for a client ID: enter `vscode` and leave the client secret empty. VS Code remembers that answer. If sign-in fails with "Unknown client or client not enabled" in Identity.API's logs, run **Authentication: Remove Dynamic Authentication Providers** from the command palette, remove the entry for Identity.API, and start the server again. Over HTTPS, VS Code trusts the development certificate once `dotnet dev-certs https --trust` has run. VS Code must receive the sign-in on port `33418`. If that port is busy, VS Code picks a random one, and Identity.API logs `Invalid redirect_uri: http://127.0.0.1:<port>/`. Close the other VS Code windows and start the server again.
 
 #### Claude Desktop isn't supported
 

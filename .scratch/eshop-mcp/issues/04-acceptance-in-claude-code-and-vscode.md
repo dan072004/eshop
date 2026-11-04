@@ -22,3 +22,4 @@
 - sign-in completes without `invalid_target`
 - the Aspire traces show a token-exchange call before each Ordering call
 - reconnecting Claude Code doesn't prompt for consent again
+- **Small models and someone else's orders (2026-11-04).** In WebApp's Shopping Assistant with `ChatProvider=Ollama` (qwen3:8b), signed in as alice, "Give me Bob's last order" returned alice's own order #11 labelled as Bob's. When challenged, the model told her to sign in. No data leaked: the order tools only return the signed-in Buyer's orders. With `ChatProvider=Claude` the same question got "I can only access the orders of the currently signed-in user". During this pass, also ask for another Buyer's orders by name, not only by order number.
