@@ -37,16 +37,15 @@ public static class AuthenticationExtensions
 
             options.Authority = identityUrl;
             options.RequireHttpsMetadata = false;
+            // Validated: an API accepts only tokens issued for it, not one for another API or for eShop.Mcp.
             options.Audience = audience;
-            
+
 #if DEBUG
             //Needed if using Android Emulator Locally. See https://learn.microsoft.com/en-us/dotnet/maui/data-cloud/local-web-services?view=net-maui-8.0#android
             options.TokenValidationParameters.ValidIssuers = [identityUrl, "https://10.0.2.2:5243"];
 #else
             options.TokenValidationParameters.ValidIssuers = [identityUrl];
 #endif
-            
-            options.TokenValidationParameters.ValidateAudience = false;
         });
 
         services.AddAuthorization();

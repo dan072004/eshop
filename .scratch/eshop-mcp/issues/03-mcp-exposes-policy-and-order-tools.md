@@ -9,7 +9,7 @@
 
 **Blocked by:** 01 (eShop.Mcp serves `search_catalog`), assistant-policies-and-orders 04 (`search_policies` in the library), assistant-policies-and-orders 07 (`get_order` in the library)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] `Mcp.FunctionalTests`:
   - [ ] `tools/list` returns exactly `search_policies`, `search_catalog`, `list_my_orders` and `get_order`, with the contract's parameter names
@@ -19,3 +19,7 @@
   - [ ] `search_policies` and `search_catalog` reach their backends with no `Authorization` header
 - [ ] Each tool's result shape is not tested again here. The library's tests cover it
 - [ ] AppHost unit tests: `eshop-mcp` references policy-api, catalog-api and ordering-api
+
+## Comments
+
+**Superseded in part (2026-11-04).** The tools and their wiring stand. Forwarding the caller's own token to Ordering, and the `orders`-audience check added in the review (`c9962fd`), are replaced by token exchange in ticket 07 (ADR 0005, as rewritten after the ticket 02 prototype). A token from a spec-compliant client names only eShop.Mcp's URL, so forwarding it would be token passthrough. This ticket stays done.

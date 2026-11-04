@@ -1,4 +1,4 @@
-using eShop.Identity.API.Configuration;
+﻿using eShop.Identity.API.Configuration;
 using eShop.Identity.API.Services;
 using Microsoft.Extensions.Configuration;
 
@@ -7,14 +7,22 @@ namespace eShop.Application.UnitTests;
 [TestClass]
 public class IdentityConfigurationTests
 {
+    // MCP clients name eShop.Mcp by its URL as the resource indicator, so its resource carries that name and lists the
+    // eshop-mcp scope; no resource is named eshop-mcp any more (ADR 0005).
     [TestMethod]
-    public void ApiResourcesAndScopesStayAligned()
+    public void EshopMcpsResourceIsNamedByItsConfiguredUrlAndOtherResourcesKeepTheirNames()
     {
-        var resources = Config.GetApis().Select(resource => resource.Name).Order().ToArray();
-        var scopes = Config.GetApiScopes().Select(scope => scope.Name).Order().ToArray();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["EshopMcpUrl"] = "http://localhost:5229/mcp" })
+            .Build();
 
-        CollectionAssert.AreEqual(resources, scopes);
-        CollectionAssert.AreEquivalent(new[] { "basket", "orders", "webhooks" }, scopes);
+        var resources = Config.GetApis(configuration).ToDictionary(resource => resource.Name);
+        var scopes = Config.GetApiScopes().Select(scope => scope.Name).ToArray();
+
+        CollectionAssert.AreEquivalent(new[] { "basket", "http://localhost:5229/mcp", "orders", "webhooks" }, resources.Keys);
+        CollectionAssert.AreEqual(new[] { "eshop-mcp" }, resources["http://localhost:5229/mcp"].Scopes.ToArray());
+        CollectionAssert.AreEqual(new[] { "orders" }, resources["orders"].Scopes.ToArray());
+        CollectionAssert.AreEquivalent(new[] { "basket", "eshop-mcp", "orders", "webhooks" }, scopes);
     }
 
     [TestMethod]
@@ -27,7 +35,9 @@ public class IdentityConfigurationTests
             ["WebhooksWebClient"] = "https://webhooks-client.test",
             ["BasketApiClient"] = "https://basket.test",
             ["OrderingApiClient"] = "https://ordering.test",
-            ["WebhooksApiClient"] = "https://webhooks.test"
+            ["WebhooksApiClient"] = "https://webhooks.test",
+            ["ClaudeCodeCallbackPort"] = "33419",
+            ["EshopMcpServerSecret"] = "test-secret"
         };
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
 
@@ -37,6 +47,13 @@ public class IdentityConfigurationTests
         CollectionAssert.Contains(clients["webhooksclient"].AllowedScopes.ToList(), "webhooks");
         CollectionAssert.Contains(clients["maui"].AllowedScopes.ToList(), "basket");
         CollectionAssert.Contains(clients["maui"].AllowedScopes.ToList(), "orders");
+        // With a resource indicator "orders" would be dropped from an MCP client's token, so they can't ask for it.
+        foreach (var mcpClient in new[] { "claude-code", "vscode" })
+        {
+            CollectionAssert.AreEquivalent(
+                new[] { "openid", "profile", "offline_access", "eshop-mcp" },
+                clients[mcpClient].AllowedScopes.ToArray());
+        }
     }
 
     [TestMethod]

@@ -149,6 +149,55 @@ aspire run
 
 The Shopping Assistant uses `claude-haiku-4-5` with replies of up to 1024 tokens and thinking turned off. To change the model or the reply length, set `Claude:ModelId` or `Claude:MaxOutputTokens` in WebApp's configuration (for example `Claude__ModelId` as an environment variable or in WebApp's user secrets).
 
+### Optional: Connect Claude Code or VS Code
+
+eShop.Mcp (the `eshop-mcp` resource) is an MCP server for local AI clients, at `https://localhost:7229/mcp` (`http://localhost:5229/mcp` when `ESHOP_USE_HTTP_ENDPOINTS=1`). On first use the client opens AdventureWorks' login page in your browser. Sign in as a Buyer (for example `alice` / `Pass123$`) and approve the consent screen. Tick **Remember My Decision** so later connections skip it. Every tool call then runs as that Buyer, and "my orders" means only their orders. See [ADR 0005](docs/adr/0005-mcp-clients-sign-in-as-the-buyer.md) for the design.
+
+Both clients are registered in Identity.API (`src/Identity.API/Configuration/Config.cs`), so neither needs dynamic client registration or a client secret.
+
+Use the server URL exactly as given here, with `localhost`. The client names eShop.Mcp by that URL when it signs in, and Identity.API and eShop.Mcp know it by only that one URL (the AppHost passes it to both as `EshopMcpUrl`). A client configured with `127.0.0.1` instead sees a mismatch and refuses to sign in.
+
+> [!NOTE]
+> The client asks for a token for eShop.Mcp by its URL (an RFC 8707 resource indicator). In Duende IdentityServer that is resource isolation, an Enterprise edition feature. In development Identity.API runs unlicensed in trial mode, which only logs a warning after 500 requests. Outside development, MCP sign-in needs a Duende Enterprise or Community Edition licence.
+
+#### Claude Code
+
+Run the whole AppHost over plain HTTP, then register the HTTP URL:
+
+```powershell
+$env:ESHOP_USE_HTTP_ENDPOINTS = "1"
+aspire run
+claude mcp add --transport http --client-id claude-code --callback-port 33419 eshop http://localhost:5229/mcp
+```
+
+Then run `/mcp` in Claude Code and choose **Authenticate** for `eshop`. The callback port must match Identity.API's `ClaudeCodeCallbackPort` setting (default `33419`, in `src/Identity.API/appsettings.json`). If that port is taken on your machine, change the setting and pass the same port to `--callback-port`.
+
+Over HTTPS, Claude Code doesn't trust the .NET development certificate. Pointing `NODE_EXTRA_CA_CERTS` at an exported copy of the certificate is unreliable: Claude Code 2.1.286 ignores it when it reconnects, so the connection fails after the first sign-in. Use the HTTP setup above.
+
+> [!WARNING]
+> The Azure Cosmos DB Emulator installs self-signed root certificates with the subject `CN=localhost`. They break trust in the .NET development certificate, which has the same subject. If HTTPS connections to eShop fail with certificate errors and the emulator is installed, remove its certificates from your trusted roots or use the HTTP setup.
+
+#### GitHub Copilot in VS Code
+
+Add the server to `.vscode/mcp.json` (or your user MCP configuration), using the URL for the way the AppHost runs: `http://localhost:5229/mcp` with `ESHOP_USE_HTTP_ENDPOINTS=1`, as for Claude Code, or `https://localhost:7229/mcp` without it.
+
+```json
+{
+  "servers": {
+    "eshop": {
+      "type": "http",
+      "url": "http://localhost:5229/mcp"
+    }
+  }
+}
+```
+
+Start the server from the file. Identity.API offers no dynamic client registration, so VS Code asks for a client ID: enter `vscode` and leave the client secret empty. VS Code remembers that answer. If sign-in fails with "Unknown client or client not enabled" in Identity.API's logs, run **Authentication: Remove Dynamic Authentication Providers** from the command palette, remove the entry for Identity.API, and start the server again. Over HTTPS, VS Code trusts the development certificate once `dotnet dev-certs https --trust` has run. VS Code must receive the sign-in on port `33418`. If that port is busy, VS Code picks a random one, and Identity.API logs `Invalid redirect_uri: http://127.0.0.1:<port>/`. Close the other VS Code windows and start the server again.
+
+#### Claude Desktop isn't supported
+
+Claude Desktop and claude.ai custom connectors call MCP servers from Anthropic's cloud, which can't reach eShop.Mcp or Identity.API on your machine (ADR 0005).
+
 ### Deploy to Azure Container Apps
 
 The AppHost is already configured with an Azure Container Apps environment, so the Aspire CLI can deploy directly from the application model. See the [Aspire Azure Container Apps deployment guide](https://aspire.dev/deployment/azure/container-apps/) for details.
