@@ -91,6 +91,17 @@ var eshopMcp = builder.AddDotnetProject("eshop-mcp", "../eShop.Mcp", o => o.Laun
     .WithEnvironment("Identity__Url", identityEndpoint)
     .WithHttpHealthCheck("/health");
 
+// eShop.Mcp's /mcp URL is its audience and Identity.API's resource name for it; the generated secret authenticates
+// eShop.Mcp as the confidential client eshop-mcp-server when it exchanges a Buyer's token (ADR 0005). Identity.API
+// referencing eShop.Mcp's endpoint joins the reference cycle below.
+var eshopMcpUrl = ReferenceExpression.Create($"{eshopMcp.GetEndpoint(launchProfileName)}/mcp");
+var eshopMcpServerSecret = builder.AddParameter(
+    "eshop-mcp-server-secret", new GenerateParameterDefault { MinLength = 32, Special = false }, secret: true);
+identityApi.WithEnvironment("EshopMcpUrl", eshopMcpUrl)
+           .WithEnvironment("EshopMcpServerSecret", eshopMcpServerSecret);
+eshopMcp.WithEnvironment("EshopMcpUrl", eshopMcpUrl)
+        .WithEnvironment("EshopMcpServerSecret", eshopMcpServerSecret);
+
 // Set ChatProvider (None, Ollama, Foundry or Claude) and EmbeddingProvider (None, Ollama or Foundry),
 // both default None, to switch on the Shopping Assistant and semantic catalog and Policy search.
 builder.AddChatAndEmbeddingProviders(catalogApi, webApp, policyApi);

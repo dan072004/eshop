@@ -28,7 +28,8 @@ public class IdentityConfigurationTests
             ["BasketApiClient"] = "https://basket.test",
             ["OrderingApiClient"] = "https://ordering.test",
             ["WebhooksApiClient"] = "https://webhooks.test",
-            ["ClaudeCodeCallbackPort"] = "33419"
+            ["ClaudeCodeCallbackPort"] = "33419",
+            ["EshopMcpServerSecret"] = "test-secret"
         };
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
 

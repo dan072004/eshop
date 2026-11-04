@@ -20,17 +20,22 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A valid exchange for alice: `sub` is alice's, `aud` is `orders`, `scope` is `orders`, `act.client_id` is `eshop-mcp-server`, `exp - iat` is 300 seconds, and the response has no refresh token
-- [ ] Each of these is refused, each request valid except for one thing:
-  - [ ] the subject token's audience isn't eShop.Mcp's URL (for example `orders`)
-  - [ ] the subject token lacks the `eshop-mcp` scope
-  - [ ] the subject token is expired
-  - [ ] the subject token is signed by another key
-  - [ ] the request comes from `claude-code`
-  - [ ] the `eshop-mcp-server` secret is wrong
-  - [ ] the requested scope is something other than `orders`
-  - [ ] the subject's user doesn't exist
-- [ ] AppHost unit tests: Identity.API and eShop.Mcp receive the same `eshop-mcp-server` secret parameter, and both receive `EshopMcpUrl`
-- [ ] Security review of the grant, run with the security-reviewer agent as the verify skill requires for Identity.API changes, with findings recorded in the comments
+- [x] A valid exchange for alice: `sub` is alice's, `aud` is `orders`, `scope` is `orders`, `act.client_id` is `eshop-mcp-server`, `exp - iat` is 300 seconds, and the response has no refresh token
+- [x] Each of these is refused, each request valid except for one thing:
+  - [x] the subject token's audience isn't eShop.Mcp's URL (for example `orders`)
+  - [x] the subject token lacks the `eshop-mcp` scope
+  - [x] the subject token is expired
+  - [x] the subject token is signed by another key
+  - [x] the request comes from `claude-code`
+  - [x] the `eshop-mcp-server` secret is wrong
+  - [x] the requested scope is something other than `orders`
+  - [x] the subject's user doesn't exist
+- [x] AppHost unit tests: Identity.API and eShop.Mcp receive the same `eshop-mcp-server` secret parameter, and both receive `EshopMcpUrl`
+- [x] Security review of the grant, run with the security-reviewer agent as the verify skill requires for Identity.API changes, with findings recorded in the comments
+
+## Comments
+
+- Done: `TokenExchangeGrantValidator` (Duende extension grant) validates the subject token with `ITokenValidator` (signature, issuer, lifetime, `eshop-mcp` scope) and checks the `EshopMcpUrl` audience itself, because Duende doesn't check audience for access tokens. It issues a token for the same `sub` with `act: { client_id }`, and `ProfileService` emits `act` into access tokens. The confidential client `eshop-mcp-server` takes its secret from `EshopMcpServerSecret`. The AppHost generates `eshop-mcp-server-secret` and passes it, with `EshopMcpUrl`, to identity-api and eshop-mcp. New `tests/Identity.FunctionalTests` has 9 tests against the real Identity.API on Postgres. Duende's real codes: a claude-code request gets `unsupported_grant_type`, a wrong secret gets 400 `invalid_client`, and a wrong scope gets `invalid_scope`; every other refusal gets `invalid_grant`. A mutation check confirmed that the audience and scope tests fail without their checks.
+- Security review (security-reviewer agent): no vulnerabilities in the change. It checked chaining (blocked by scope and audience), replay (limited to the secret holder and the subject token's lifetime), who may call the grant, the audience comparison, `subject_token_type`, `act` injection, IsActive, and secret handling. Out of scope, but worth noting: `ProfileService` ignores `RequestedClaimTypes`, so every access token, including the new `orders` token, carries the user's card claims (Medium, existed before this change). That deserves its own hardening ticket.

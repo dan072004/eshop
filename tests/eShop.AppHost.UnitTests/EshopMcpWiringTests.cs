@@ -66,6 +66,37 @@ public class EshopMcpWiringTests
         Assert.AreEqual("{identity-api.bindings.http.url}", (await EnvironmentOf(appHost, mcp))["Identity__Url"]);
     }
 
+    [TestMethod]
+    [DoNotParallelize]
+    [DataRow(false, "{eshop-mcp.bindings.https.url}/mcp")]
+    [DataRow(true, "{eshop-mcp.bindings.http.url}/mcp")]
+    public async Task IdentityApiAndEshopMcpReceiveTheSameMcpUrl(bool useHttpEndpoints, string expectedUrl)
+    {
+        await using var appHost = await CreateAppHostAsync(useHttpEndpoints);
+
+        var identityEnvironment = await EnvironmentOf(appHost, Resource(appHost, "identity-api"));
+        var mcpEnvironment = await EnvironmentOf(appHost, Resource(appHost, "eshop-mcp"));
+
+        Assert.AreEqual(expectedUrl, identityEnvironment["EshopMcpUrl"]);
+        Assert.AreEqual(expectedUrl, mcpEnvironment["EshopMcpUrl"]);
+    }
+
+    [TestMethod]
+    [DoNotParallelize]
+    public async Task IdentityApiAndEshopMcpReceiveTheSameGeneratedClientSecret()
+    {
+        await using var appHost = await CreateAppHostAsync(useHttpEndpoints: false);
+
+        var secret = appHost.Resources.OfType<ParameterResource>().Single(p => p.Name == "eshop-mcp-server-secret");
+        Assert.IsTrue(secret.Secret);
+        Assert.IsNotNull(secret.Default, "The secret is generated, so nobody has to set it.");
+
+        var identityEnvironment = await EnvironmentOf(appHost, Resource(appHost, "identity-api"));
+        var mcpEnvironment = await EnvironmentOf(appHost, Resource(appHost, "eshop-mcp"));
+        Assert.AreEqual("{eshop-mcp-server-secret.value}", identityEnvironment["EshopMcpServerSecret"]);
+        Assert.AreEqual("{eshop-mcp-server-secret.value}", mcpEnvironment["EshopMcpServerSecret"]);
+    }
+
     // The AppHost reads ESHOP_USE_HTTP_ENDPOINTS from the process environment, hence [DoNotParallelize] above.
     private async Task<IDistributedApplicationTestingBuilder> CreateAppHostAsync(bool useHttpEndpoints)
     {

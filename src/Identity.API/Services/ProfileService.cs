@@ -21,6 +21,11 @@
 
             var claims = GetClaimsFromUser(user);
             context.IssuedClaims = claims.ToList();
+
+            // Only TokenExchangeGrantValidator puts act on the subject; Duende emits subject claims only through here.
+            var actor = subject.FindFirst(JwtClaimTypes.Actor);
+            if (actor != null && context.Caller == IdentityServerConstants.ProfileDataCallers.ClaimsProviderAccessToken)
+                context.IssuedClaims.Add(actor);
         }
 
         public async Task IsActiveAsync(IsActiveContext context)

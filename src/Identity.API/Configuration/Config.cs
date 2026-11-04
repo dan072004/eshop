@@ -165,6 +165,19 @@
                         "http://127.0.0.1:33418/",
                         "https://vscode.dev/redirect"
                     ]),
+                // eShop.Mcp exchanges a Buyer's eShop.Mcp token for a short-lived Ordering token, and nothing else
+                // (ADR 0005, TokenExchangeGrantValidator).
+                new Client
+                {
+                    ClientId = "eshop-mcp-server",
+                    ClientName = "AdventureWorks MCP Server",
+                    ClientSecrets = { new Secret(configuration.GetRequiredValue("EshopMcpServerSecret").Sha256()) },
+                    AllowedGrantTypes = { OidcConstants.GrantTypes.TokenExchange },
+                    AllowedScopes = { "orders" },
+                    AllowOfflineAccess = false,
+                    RequireConsent = false,
+                    AccessTokenLifetime = 5 * 60
+                },
                 new Client
                 {
                     ClientId = "basketswaggerui",
