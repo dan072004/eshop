@@ -26,6 +26,9 @@ namespace eShop.Mcp.FunctionalTests;
 public sealed class McpServerFixture : WebApplicationFactory<Program>
 {
     public const string IdentityUrl = "http://identity.test";
+    // Deliberately not the host the test client reaches (localhost), so the advertised resource is shown to be the
+    // configured value rather than one derived from the request.
+    public const string McpUrl = "http://mcp.test/mcp";
     public const string PolicyUrl = "http://policy.test";
     public const string CatalogUrl = "http://catalog.test";
     public const string OrderingUrl = "http://ordering.test";
@@ -41,6 +44,7 @@ public sealed class McpServerFixture : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("Identity:Url", IdentityUrl);
+        builder.UseSetting("EshopMcpUrl", McpUrl);
         builder.UseSetting("services:policy-api:http:0", PolicyUrl);
         builder.UseSetting("services:catalog-api:http:0", CatalogUrl);
         builder.UseSetting("services:ordering-api:http:0", OrderingUrl);
@@ -63,8 +67,8 @@ public sealed class McpServerFixture : WebApplicationFactory<Program>
     }
 
     /// <summary>
-    /// Mints a token as Identity.API would issue it, signed by the test key. By default it names both audiences an MCP
-    /// client's token carries (ADR 0005).
+    /// Mints a token as Identity.API would issue it, signed by the test key. By default its only audience is eShop.Mcp's
+    /// URL, as for a client that names it as the resource (ADR 0005).
     /// </summary>
     public string MintToken(string subject, string[]? audiences = null, DateTime? expires = null, string issuer = IdentityUrl)
     {
@@ -78,8 +82,8 @@ public sealed class McpServerFixture : WebApplicationFactory<Program>
             Claims = new Dictionary<string, object>
             {
                 ["sub"] = subject,
-                ["aud"] = audiences ?? ["eshop-mcp", "orders"],
-                ["scope"] = new[] { "openid", "profile", "eshop-mcp", "orders" },
+                ["aud"] = audiences ?? [McpUrl],
+                ["scope"] = new[] { "openid", "profile", "offline_access", "eshop-mcp" },
             },
             SigningCredentials = new SigningCredentials(_signingKey, SecurityAlgorithms.RsaSha256),
         };

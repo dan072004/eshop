@@ -1,5 +1,4 @@
-﻿using System.Net;
-using System.Text.Json;
+﻿using System.Text.Json;
 using eShop.Assistant.Tools;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Client;
@@ -30,11 +29,6 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
             }
           ]
         }
-        """;
-
-    // What Ordering.API v1 returns from orders/{orderId}. No items, so get_order makes no Catalog lookups.
-    private const string OrderWithoutItems = """
-        { "orderNumber": 17, "date": "2026-10-01T09:30:00Z", "status": "Paid", "orderItems": [] }
         """;
 
     [Fact]
@@ -101,72 +95,14 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
         Assert.False(item.TryGetProperty("pictureUrl", out _));
     }
 
+    // Interim until ticket 07: the Buyer's token names only eShop.Mcp's URL, so the order tools have no token Ordering
+    // may receive and ask the Buyer to sign in, without forwarding the caller's token (no passthrough, ADR 0005).
     [Fact]
-    public async Task GetOrderReachesOrderingWithTheBuyersOwnTokenAsBearer()
-    {
-        fixture.Ordering.Reset();
-        fixture.Ordering.Respond = _ => RecordingHandler.Json(OrderWithoutItems);
-        var aliceToken = fixture.MintToken("alice");
-        await using var client = await ConnectAsync(new BearerHandler { Token = aliceToken });
-
-        var result = await client.CallToolAsync(
-            "get_order",
-            new Dictionary<string, object?> { ["orderNumber"] = 17 },
-            cancellationToken: TestContext.Current.CancellationToken);
-
-        Assert.NotEqual(true, result.IsError);
-        var request = Assert.Single(fixture.Ordering.Requests);
-        Assert.Equal("ordering.test", request.Uri.Host);
-        Assert.Equal("/api/orders/17", request.Uri.AbsolutePath);
-        Assert.Equal($"Bearer {aliceToken}", request.Authorization);
-    }
-
-    [Fact]
-    public async Task CallsWithTwoBuyersTokensOnOneClientEachReachOrderingWithTheirOwnToken()
+    public async Task OrderToolsAskTheBuyerToSignInAndNothingReachesOrdering()
     {
         fixture.Ordering.Reset();
         fixture.Ordering.Respond = _ => RecordingHandler.Json("[]");
-        var aliceToken = fixture.MintToken("alice");
-        var bobToken = fixture.MintToken("bob");
-        var bearer = new BearerHandler { Token = aliceToken };
-        await using var client = await ConnectAsync(bearer);
-
-        var asAlice = await client.CallToolAsync("list_my_orders", cancellationToken: TestContext.Current.CancellationToken);
-        bearer.Token = bobToken;
-        var asBob = await client.CallToolAsync("list_my_orders", cancellationToken: TestContext.Current.CancellationToken);
-
-        Assert.NotEqual(true, asAlice.IsError);
-        Assert.NotEqual(true, asBob.IsError);
-        Assert.Equal(
-            [$"Bearer {aliceToken}", $"Bearer {bobToken}"],
-            fixture.Ordering.Requests.Select(r => r.Authorization));
-    }
-
-    [Fact]
-    public async Task OrderingsNotFoundComesBackAsTheNotFoundErrorResult()
-    {
-        fixture.Ordering.Reset();
-        fixture.Ordering.Respond = _ => new HttpResponseMessage(HttpStatusCode.NotFound);
         await using var client = await ConnectAsBuyerAsync("alice");
-
-        var result = await client.CallToolAsync(
-            "get_order",
-            new Dictionary<string, object?> { ["orderNumber"] = 99 },
-            cancellationToken: TestContext.Current.CancellationToken);
-
-        Assert.Single(fixture.Ordering.Requests);
-        var text = Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text;
-        using var json = JsonDocument.Parse(text);
-        Assert.Equal("not_found", json.RootElement.GetProperty("error").GetString());
-    }
-
-    [Fact]
-    public async Task TokenWithoutTheOrdersAudienceIsNotForwardedAndTheOrderToolsAskTheBuyerToSignIn()
-    {
-        // Ordering.API doesn't validate the audience, so it would accept this token; eShop.Mcp must not pass it on (ADR 0005).
-        fixture.Ordering.Reset();
-        fixture.Ordering.Respond = _ => RecordingHandler.Json("[]");
-        await using var client = await ConnectAsync(new BearerHandler { Token = fixture.MintToken("alice", audiences: ["eshop-mcp"]) });
 
         var listed = await client.CallToolAsync("list_my_orders", cancellationToken: TestContext.Current.CancellationToken);
         var got = await client.CallToolAsync(

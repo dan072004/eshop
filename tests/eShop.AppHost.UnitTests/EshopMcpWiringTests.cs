@@ -53,19 +53,8 @@ public class EshopMcpWiringTests
         Assert.AreEqual(7229, endpoints.Single(e => e.Name == "https").Port);
     }
 
-    [TestMethod]
-    [DoNotParallelize]
-    public async Task EshopMcpUsesTheHttpProfileWhenHttpEndpointsAreForced()
-    {
-        await using var appHost = await CreateAppHostAsync(useHttpEndpoints: true);
-        var mcp = Resource(appHost, "eshop-mcp");
-
-        var endpoint = mcp.Annotations.OfType<EndpointAnnotation>().Single();
-        Assert.AreEqual("http", endpoint.Name);
-        Assert.AreEqual(5229, endpoint.Port);
-        Assert.AreEqual("{identity-api.bindings.http.url}", (await EnvironmentOf(appHost, mcp))["Identity__Url"]);
-    }
-
+    // One value names eShop.Mcp's API resource in Identity.API and is the audience and metadata "resource" eShop.Mcp
+    // uses, so the three can't disagree (ADR 0005). It follows the active launch profile.
     [TestMethod]
     [DoNotParallelize]
     [DataRow(false, "{eshop-mcp.bindings.https.url}/mcp")]
@@ -79,6 +68,19 @@ public class EshopMcpWiringTests
 
         Assert.AreEqual(expectedUrl, identityEnvironment["EshopMcpUrl"]);
         Assert.AreEqual(expectedUrl, mcpEnvironment["EshopMcpUrl"]);
+    }
+
+    [TestMethod]
+    [DoNotParallelize]
+    public async Task EshopMcpUsesTheHttpProfileWhenHttpEndpointsAreForced()
+    {
+        await using var appHost = await CreateAppHostAsync(useHttpEndpoints: true);
+        var mcp = Resource(appHost, "eshop-mcp");
+
+        var endpoint = mcp.Annotations.OfType<EndpointAnnotation>().Single();
+        Assert.AreEqual("http", endpoint.Name);
+        Assert.AreEqual(5229, endpoint.Port);
+        Assert.AreEqual("{identity-api.bindings.http.url}", (await EnvironmentOf(appHost, mcp))["Identity__Url"]);
     }
 
     [TestMethod]
