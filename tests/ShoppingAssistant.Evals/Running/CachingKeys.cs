@@ -1,5 +1,6 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
 using ShoppingAssistant.Evals.Judge;
 
@@ -10,14 +11,15 @@ namespace ShoppingAssistant.Evals.Running;
 /// and iteration names, the provider and the model id. Each added key is a hash of an input Reporting can't see, so
 /// changing it makes the next run call the model again instead of replaying a stale answer.
 /// </summary>
-public static class CachingKeys
+public static partial class CachingKeys
 {
     /// <summary>
     /// The keys for one case's chat turns and its judge call:
     /// <list type="bullet">
     /// <item>every tool's name, description and parameter schema, in the order they are sent (Reporting's key leaves
     /// out <c>ChatOptions.Tools</c>);</item>
-    /// <item>this case's entry in the case file, as written, so editing one case resamples only that case;</item>
+    /// <item>this case's entry in the case file, as written but without its <c>knownMiss</c> note, so editing one case
+    /// resamples only that case, and noting a miss resamples nothing;</item>
     /// <item>the world file.</item>
     /// </list>
     /// </summary>
@@ -54,9 +56,14 @@ public static class CachingKeys
         using var document = JsonDocument.Parse(caseFile);
         return document.RootElement.GetProperty("cases").EnumerateArray()
             .FirstOrDefault(c => c.TryGetProperty("id", out var id) && id.ValueEquals(caseId)) is { ValueKind: JsonValueKind.Object } entry
-                ? entry.GetRawText()
+                ? KnownMissNote().Replace(entry.GetRawText(), "")
                 : throw new InvalidDataException($"The case file has no case '{caseId}'.");
     }
+
+    // A knownMiss note, with the comma that joins it to the entry. It changes neither the conversation nor the grading,
+    // so noting a miss doesn't resample it; cutting it from the text keeps the key of an entry without one unchanged.
+    [GeneratedRegex("""\s*,\s*"knownMiss"\s*:\s*"(?:[^"\\]|\\.)*"|"knownMiss"\s*:\s*"(?:[^"\\]|\\.)*"\s*,\s*""")]
+    private static partial Regex KnownMissNote();
 
     private static string Hash(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 }

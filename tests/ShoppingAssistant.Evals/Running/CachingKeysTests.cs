@@ -60,6 +60,17 @@ public sealed class CachingKeysTests
     }
 
     [Fact]
+    public void NotingAKnownMissLeavesTheCasesKeysAloneSoTheMissIsNotResampled()
+    {
+        var noted = CaseFile.Replace(
+            "\"turns\": [\"what's the return window for my last order?\"] }",
+            "\"turns\": [\"what's the return window for my last order?\"], \"knownMiss\": \"Cites only the standard window.\" }",
+            StringComparison.Ordinal);
+
+        Assert.Equal(Keys(), Keys(caseFile: noted));
+    }
+
+    [Fact]
     public void ChangingAnotherCaseLeavesThisCasesKeysAlone()
     {
         var edited = CaseFile.Replace("how much is shipping?", "what does shipping cost?", StringComparison.Ordinal);
