@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Aspire.AppHost.Sdk/13.6.0">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -7,21 +7,37 @@
     <OutputType>Exe</OutputType>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AspireUseCliBundle>true</AspireUseCliBundle>
     <!-- Holds ANTHROPIC_API_KEY for local eval runs: dotnet user-secrets set ANTHROPIC_API_KEY <key> -->
     <UserSecretsId>7d1f3c2e-5b8a-4e6f-9c0d-2a4b6e8f1c3d</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <PackageReference Include="Microsoft.Extensions.AI.Evaluation" />
+    <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Reporting" />
     <PackageReference Include="xunit.v3.mtp-v2" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\WebApp\WebApp.csproj" />
+    <ProjectReference Include="..\..\src\WebApp\WebApp.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="..\..\src\Policy.API\Policy.API.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="World\world.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Cases\cases.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- The results store defaults to <artifacts>/evals-store, wherever the build puts its artifacts. -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>ArtifactsPath</_Parameter1>
+      <_Parameter2>$(ArtifactsPath)</_Parameter2>
+    </AssemblyAttribute>
   </ItemGroup>
 
 </Project>

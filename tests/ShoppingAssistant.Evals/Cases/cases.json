@@ -1,0 +1,26 @@
+{
+  "$comment": "The eval cases, written from the Policy files and World/world.json before the first run, and never reworded to make them pass: a case that fails stays failing with a knownMiss note until the prompt or tools are fixed. The fields are documented on EvalCase.",
+  "cases": [
+    {
+      "id": "returns-gps-watch-last-order",
+      "category": "order",
+      "signedInAs": "alice",
+      "turns": ["what's the return window for my last order?"],
+      "catalogResults": null,
+      "mustCallTools": ["list_my_orders", "get_order", "search_policies"],
+      "mustNotCallTools": [],
+      "mustCite": [
+        "Returns Exceptions › GPS watches, navigators and bike computers",
+        "Returns Policy › Return window"
+      ],
+      "mustContain": [],
+      "mustNotContain": ["201", "202"],
+      "reference": "Your last order that can be returned is order 101, placed on October 20, 2026. The VenturePro GPS Watch is navigation electronics, so it has a 30-day return window, until November 19, 2026 (Returns Exceptions › GPS watches, navigators and bike computers). The Frostbite Insulated Jacket has the standard 60-day window, until December 19, 2026 (Returns Policy › Return window).",
+      "rubric": [
+        "Gives a separate Return Window per item: 30 days for the GPS watch and 60 days for the jacket",
+        "End dates are counted from the Order Date (2026-10-20): November 19, 2026 for the watch and December 19, 2026 for the jacket"
+      ],
+      "knownMiss": "2026-11-09, Haiku 4.5, 2 of 2 runs: answers about order 102 (alice's newest order, an unshipped helmet) with the standard 60 days and never cites the GPS watch exception. The world makes 102 her last order; see ticket 03's Comments."
+    }
+  ]
+}

@@ -36,10 +36,13 @@ public static class ClaudeChatPipeline
             .Build(services);
     }
 
-    internal static string GetModelId(IConfiguration configuration)
+    /// <summary>The model id: <c>Claude:ModelId</c>, or <c>claude-haiku-4-5</c>.</summary>
+    public static string GetModelId(IConfiguration configuration)
         => configuration["Claude:ModelId"] is { Length: > 0 } modelId ? modelId : DefaultModelId;
 
-    internal static int GetMaxOutputTokens(IConfiguration configuration)
+    /// <summary>The output limit: <c>Claude:MaxOutputTokens</c>, or 1024.</summary>
+    /// <exception cref="InvalidOperationException">The setting is not a positive whole number.</exception>
+    public static int GetMaxOutputTokens(IConfiguration configuration)
     {
         var value = configuration["Claude:MaxOutputTokens"];
         if (string.IsNullOrWhiteSpace(value))
