@@ -15,12 +15,11 @@
       ],
       "mustContain": [],
       "mustNotContain": ["201", "202"],
-      "reference": "Your last order that can be returned is order 101, placed on October 20, 2026. The VenturePro GPS Watch is navigation electronics, so it has a 30-day return window, until November 19, 2026 (Returns Exceptions › GPS watches, navigators and bike computers). The Frostbite Insulated Jacket has the standard 60-day window, until December 19, 2026 (Returns Policy › Return window).",
+      "reference": "Your last order is order 101, placed on October 31, 2026. The VenturePro GPS Watch is navigation electronics, so it has a 30-day return window, until November 30, 2026 (Returns Exceptions › GPS watches, navigators and bike computers). The Frostbite Insulated Jacket has the standard 60-day window, until December 30, 2026 (Returns Policy › Return window).",
       "rubric": [
         "Gives a separate Return Window per item: 30 days for the GPS watch and 60 days for the jacket",
-        "End dates are counted from the Order Date (2026-10-20): November 19, 2026 for the watch and December 19, 2026 for the jacket"
-      ],
-      "knownMiss": "2026-11-09, Haiku 4.5, 2 of 2 runs: answers about order 102 (alice's newest order, an unshipped helmet) with the standard 60 days and never cites the GPS watch exception. The world makes 102 her last order; see ticket 03's Comments."
+        "End dates are counted from the Order Date (2026-10-31): November 30, 2026 for the watch and December 30, 2026 for the jacket"
+      ]
     }
   ]
 }

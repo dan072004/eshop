@@ -32,7 +32,7 @@
     }
   ],
   "orders": [
-    { "orderNumber": 101, "buyer": "alice", "orderDate": "2026-10-20T09:30:00Z", "status": "Shipped", "items": [ { "productId": 9, "units": 1 }, { "productId": 8, "units": 1 } ] },
+    { "orderNumber": 101, "buyer": "alice", "orderDate": "2026-10-31T09:30:00Z", "status": "Shipped", "items": [ { "productId": 9, "units": 1 }, { "productId": 8, "units": 1 } ] },
     { "orderNumber": 102, "buyer": "alice", "orderDate": "2026-10-30T09:30:00Z", "status": "AwaitingValidation", "items": [ { "productId": 10, "units": 1 } ] },
     { "$comment": "Outside its Return Window on 2026-11-01.", "orderNumber": 103, "buyer": "alice", "orderDate": "2026-07-15T09:30:00Z", "status": "Shipped", "items": [ { "productId": 1, "units": 1 } ] },
     { "orderNumber": 104, "buyer": "alice", "orderDate": "2026-10-25T09:30:00Z", "status": "Cancelled", "items": [ { "productId": 4, "units": 1 } ] },

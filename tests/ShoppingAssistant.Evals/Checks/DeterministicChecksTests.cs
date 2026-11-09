@@ -95,8 +95,8 @@ public sealed class DeterministicChecksTests
     public async Task CitationsPresentNeedsEachCitationStringExactly()
     {
         var conversation = AcceptanceAnswer("""
-            - VenturePro GPS Watch: 30 days, until 2026-11-19 (Returns Exceptions › GPS watches).
-            - Frostbite Insulated Jacket: 60 days, until 2026-12-19 (Returns Policy › return window).
+            - VenturePro GPS Watch: 30 days, until 2026-11-30 (Returns Exceptions › GPS watches).
+            - Frostbite Insulated Jacket: 60 days, until 2026-12-30 (Returns Policy › return window).
             """);
 
         var metric = await conversation.EvaluateAsync(new CitationsPresentEvaluator(), AcceptanceCase);
@@ -125,8 +125,8 @@ public sealed class DeterministicChecksTests
     {
         // "Returns Exceptions › Helmets" is a real Policy Section, but no search in this run returned it.
         var conversation = AcceptanceAnswer("""
-            - VenturePro GPS Watch: 30 days, until 2026-11-19 (Returns Exceptions › GPS watches, navigators and bike computers).
-            - Frostbite Insulated Jacket: 60 days, until 2026-12-19 (**Returns Exceptions › Helmets**).
+            - VenturePro GPS Watch: 30 days, until 2026-11-30 (Returns Exceptions › GPS watches, navigators and bike computers).
+            - Frostbite Insulated Jacket: 60 days, until 2026-12-30 (**Returns Exceptions › Helmets**).
             """);
 
         var metric = await conversation.EvaluateAsync(new CitationsGroundedEvaluator(), AcceptanceCase);
@@ -175,7 +175,7 @@ public sealed class DeterministicChecksTests
     [Fact]
     public async Task StringsMatchWholeTokensSoTheYearDoesNotContainBobsOrder202()
     {
-        // The good answer's dates (2026-11-19, 2026-12-19) start with "202".
+        // The good answer's dates (2026-11-30, 2026-12-30) start with "202".
         var metric = await AcceptanceAnswer().EvaluateAsync(new StringsEvaluator(), AcceptanceCase);
 
         Assert.Equivalent(new { Name = "Strings", Value = true, Interpretation = new { Failed = false } }, metric);
@@ -184,13 +184,13 @@ public sealed class DeterministicChecksTests
     [Fact]
     public async Task AMissingRequiredStringFailsMustContain()
     {
-        var evalCase = AcceptanceCase with { MustContain = ["2026-11-19", "2026-12-19"] };
+        var evalCase = AcceptanceCase with { MustContain = ["2026-11-30", "2026-12-30"] };
 
-        var metric = await AcceptanceAnswer("The watch has 30 days, until 2026-11-19; the jacket has 60 days.")
+        var metric = await AcceptanceAnswer("The watch has 30 days, until 2026-11-30; the jacket has 60 days.")
             .EvaluateAsync(new StringsEvaluator(), evalCase);
 
         Assert.Equivalent(
-            new { Name = "Strings", Value = false, Reason = "Missing: \"2026-12-19\".", Interpretation = new { Failed = true } },
+            new { Name = "Strings", Value = false, Reason = "Missing: \"2026-12-30\".", Interpretation = new { Failed = true } },
             metric);
     }
 
@@ -232,11 +232,11 @@ public sealed class DeterministicChecksTests
         .User(Question)
         .Tool("list_my_orders", """
             { "today": "2026-11-01", "orders": [
-              { "orderNumber": 102, "orderDate": "2026-10-30T09:30:00Z", "status": "AwaitingValidation", "total": 59.99 },
-              { "orderNumber": 101, "orderDate": "2026-10-20T09:30:00Z", "status": "Shipped", "total": 379.98 } ] }
+              { "orderNumber": 101, "orderDate": "2026-10-31T09:30:00Z", "status": "Shipped", "total": 379.98 },
+              { "orderNumber": 102, "orderDate": "2026-10-30T09:30:00Z", "status": "AwaitingValidation", "total": 59.99 } ] }
             """)
         .Tool("get_order", """
-            { "today": "2026-11-01", "orderNumber": 101, "orderDate": "2026-10-20T09:30:00Z", "status": "Shipped", "items": [
+            { "today": "2026-11-01", "orderNumber": 101, "orderDate": "2026-10-31T09:30:00Z", "status": "Shipped", "items": [
               { "productId": 9, "productName": "VenturePro GPS Watch", "type": "Navigation" },
               { "productId": 8, "productName": "Frostbite Insulated Jacket", "type": "Jackets" } ] }
             """, new() { ["orderNumber"] = 101 })
@@ -250,8 +250,8 @@ public sealed class DeterministicChecksTests
               { "citation": "Returns Policy › Gift returns", "text": "Gifts can be returned within the same 60 days." } ] }
             """)
         .Answer(answer ?? """
-            Your last shipped order is 101, placed on 2026-10-20:
-            - VenturePro GPS Watch: 30 days, until 2026-11-19 (Returns Exceptions › GPS watches, navigators and bike computers).
-            - Frostbite Insulated Jacket: 60 days, until 2026-12-19 (Returns Policy › Return window).
+            Your last order is 101, placed on 2026-10-31:
+            - VenturePro GPS Watch: 30 days, until 2026-11-30 (Returns Exceptions › GPS watches, navigators and bike computers).
+            - Frostbite Insulated Jacket: 60 days, until 2026-12-30 (Returns Policy › Return window).
             """);
 }

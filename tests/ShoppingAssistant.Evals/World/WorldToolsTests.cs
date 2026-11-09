@@ -20,9 +20,9 @@ public sealed class WorldToolsTests
             {
               "today": "2026-11-01",
               "orders": [
+                { "orderNumber": 101, "orderDate": "2026-10-31T09:30:00Z", "status": "Shipped", "total": 379.98 },
                 { "orderNumber": 102, "orderDate": "2026-10-30T09:30:00Z", "status": "AwaitingValidation", "total": 59.99 },
                 { "orderNumber": 104, "orderDate": "2026-10-25T09:30:00Z", "status": "Cancelled", "total": 129.99 },
-                { "orderNumber": 101, "orderDate": "2026-10-20T09:30:00Z", "status": "Shipped", "total": 379.98 },
                 { "orderNumber": 103, "orderDate": "2026-07-15T09:30:00Z", "status": "Shipped", "total": 109.99 }
               ]
             }
@@ -39,7 +39,7 @@ public sealed class WorldToolsTests
             {
               "today": "2026-11-01",
               "orderNumber": 101,
-              "orderDate": "2026-10-20T09:30:00Z",
+              "orderDate": "2026-10-31T09:30:00Z",
               "status": "Shipped",
               "items": [
                 { "productId": 9, "productName": "VenturePro GPS Watch", "units": 1, "unitPrice": 199.99, "type": "Navigation", "brand": "AirStrider" },
