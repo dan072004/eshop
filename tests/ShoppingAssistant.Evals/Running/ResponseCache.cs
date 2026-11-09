@@ -60,20 +60,6 @@ public static class ResponseCache
 }
 
 /// <summary>
-/// Where a sample's answer came from, recorded as a tag on its stored result: <see cref="CachedTag"/> when every chat
-/// turn was replayed from the cache, <see cref="FreshTag"/> when the model was called. A cached sample is reused
-/// evidence, not a new sample. The judge's own cache hits are in the result's <c>ChatDetails</c>.
-/// </summary>
-public static class SampleOrigin
-{
-    public const string CachedTag = "sample:cached";
-
-    public const string FreshTag = "sample:fresh";
-
-    public static string Tag(int modelCalls) => modelCalls == 0 ? CachedTag : FreshTag;
-}
-
-/// <summary>
 /// The chat model as the eval calls it: Reporting's caching client around the model, one cache per case and iteration,
 /// keyed by Reporting's key plus <see cref="CachingKeys"/>. It goes below WebApp's function invocation, so each model
 /// turn is cached on its own.

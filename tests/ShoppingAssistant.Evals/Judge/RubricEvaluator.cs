@@ -4,6 +4,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
 using ShoppingAssistant.Evals.Cases;
 using ShoppingAssistant.Evals.Checks;
+using ShoppingAssistant.Evals.Gate;
 
 namespace ShoppingAssistant.Evals.Judge;
 
@@ -168,4 +169,15 @@ public static class JudgeUsage
         result.Metrics.Values.FirstOrDefault(m => m.Name.StartsWith(RubricEvaluator.ItemPrefix, StringComparison.Ordinal))?.Metadata is { Count: > 0 } metadata
             ? "judge " + string.Join(", ", metadata.OrderBy(m => m.Key, StringComparer.Ordinal).Select(m => $"{m.Key}={m.Value}"))
             : "judge: no usage recorded";
+
+    /// <summary>The judge call's tokens, as Reporting records them on each rubric metric; none when it recorded none.</summary>
+    public static IReadOnlyList<TokenUsage> Tokens(EvaluationResult result) =>
+        result.Metrics.Values.FirstOrDefault(m => m.Name.StartsWith(RubricEvaluator.ItemPrefix, StringComparison.Ordinal))?.Metadata is { } metadata
+            && metadata.TryGetValue("eval-model", out var model)
+            && metadata.TryGetValue("eval-input-tokens", out var inputTokens)
+            && metadata.TryGetValue("eval-output-tokens", out var outputTokens)
+            && long.TryParse(inputTokens, System.Globalization.CultureInfo.InvariantCulture, out var input)
+            && long.TryParse(outputTokens, System.Globalization.CultureInfo.InvariantCulture, out var output)
+            ? [new TokenUsage(model, input, output)]
+            : [];
 }

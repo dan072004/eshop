@@ -14,6 +14,24 @@ public static class EvalSettings
 
     public const string AnthropicApiKeyName = "ANTHROPIC_API_KEY";
 
+    public const string CaseVariable = "ESHOP_EVALS_CASE";
+
+    public const string ParallelismVariable = "ESHOP_EVALS_PARALLELISM";
+
+    /// <summary>
+    /// The case ids in <c>ESHOP_EVALS_CASE</c> (comma-separated), or null to run every case. A filtered run writes the
+    /// report and the summary, and skips the gate.
+    /// </summary>
+    public static IReadOnlyList<string>? CaseFilter(string? value) =>
+        value?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) is { Length: > 0 } ids ? ids : null;
+
+    /// <summary>How many cases run at once: <c>ESHOP_EVALS_PARALLELISM</c>, or 4.</summary>
+    /// <exception cref="InvalidOperationException">The value is not a positive whole number.</exception>
+    public static int Parallelism(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? 4
+        : int.TryParse(value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var parallelism) && parallelism > 0 ? parallelism
+        : throw new InvalidOperationException($"{ParallelismVariable} is '{value}'; it must be a positive whole number.");
+
     public static bool IsEnabled => Environment.GetEnvironmentVariable(EnvironmentVariable) == "1";
 
     /// <summary>The configuration a run reads: user-secrets, then environment variables (which win).</summary>
