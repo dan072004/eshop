@@ -27,6 +27,7 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, ICha
             .ConfigurePrimaryHttpMessageHandler(() => policyApi.Server.CreateHandler());
 
         await using var provider = services.BuildServiceProvider();
+        var usage = new UsageRecorder(model);
         var basket = new OutOfScopeBasket();
         var chat = new ChatState(
             basket,
@@ -34,7 +35,7 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, ICha
             evalCase.SignedInAs is { } userName ? world.Buyer(userName).ToPrincipal() : new ClaimsPrincipal(new ClaimsIdentity()),
             provider.GetRequiredService<eShop.Assistant.Tools.AssistantTools>(),
             provider.GetRequiredService<ILoggerFactory>(),
-            ClaudeChatPipeline.Build(model, configuration, provider));
+            ClaudeChatPipeline.Build(usage, configuration, provider));
 
         foreach (var turn in evalCase.Turns)
         {
@@ -47,7 +48,26 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, ICha
             }
         }
 
-        return new CaseTranscript(chat.Messages.ToList());
+        return new CaseTranscript(chat.Messages.ToList()) { Usage = usage.Turns };
+    }
+
+    // Records the tokens each model turn reports; it sits below function invocation, so it sees every turn.
+    private sealed class UsageRecorder(IChatClient inner) : DelegatingChatClient(inner)
+    {
+        private readonly List<Gate.TokenUsage> _turns = [];
+
+        public IReadOnlyList<Gate.TokenUsage> Turns => _turns;
+
+        public override async Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            var response = await base.GetResponseAsync(messages, options, cancellationToken);
+            if (response.Usage is { } usage)
+            {
+                _turns.Add(new(response.ModelId ?? options?.ModelId ?? "unknown", usage.InputTokenCount ?? 0, usage.OutputTokenCount ?? 0));
+            }
+            return response;
+        }
     }
 
     // Records the exception the conversation class logs when a model call fails.
@@ -85,6 +105,9 @@ public sealed record CaseTranscript(IReadOnlyList<ChatMessage> Messages)
     public IReadOnlyList<ChatMessage> Prompt => [.. Messages.Take(LastUserTurn + 1)];
 
     public ChatResponse Reply => new([.. Messages.Skip(LastUserTurn + 1)]);
+
+    /// <summary>The tokens each model turn reported.</summary>
+    public IReadOnlyList<Gate.TokenUsage> Usage { get; init; } = [];
 }
 
 public sealed class ModelCallFailedException(string caseId, Exception inner)

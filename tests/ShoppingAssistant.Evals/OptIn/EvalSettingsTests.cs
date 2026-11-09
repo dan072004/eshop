@@ -26,6 +26,22 @@ public sealed class EvalSettingsTests
             error.Message);
     }
 
+    [Fact]
+    public void TheCaseFilterIsTheCommaSeparatedIdsAndNoFilterRunsEveryCase()
+    {
+        Assert.Equal(["returns-window", "bob-order-asked-directly"], EvalSettings.CaseFilter(" returns-window, bob-order-asked-directly ,"));
+        Assert.Null(EvalSettings.CaseFilter(""));
+    }
+
+    [Fact]
+    public void ParallelismDefaultsToFourAndRejectsANonPositiveNumber()
+    {
+        Assert.Equal(4, EvalSettings.Parallelism(null));
+        Assert.Equal(2, EvalSettings.Parallelism("2"));
+        var error = Assert.Throws<InvalidOperationException>(() => EvalSettings.Parallelism("0"));
+        Assert.Equal("ESHOP_EVALS_PARALLELISM is '0'; it must be a positive whole number.", error.Message);
+    }
+
     private static IConfiguration Configuration(Dictionary<string, string?> values) =>
         new ConfigurationBuilder().AddInMemoryCollection(values).Build();
 }
