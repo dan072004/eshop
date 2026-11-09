@@ -50,7 +50,7 @@ The CI workflow draft is in `evals.yml` next to this file.
 
    | Buyer | Order | Order Date | Status | Items |
    |---|---|---|---|---|
-   | alice | 101 | 2026-10-20 | Shipped | GPS watch (Navigation) + jacket |
+   | alice | 101 | 2026-10-31 | Shipped | GPS watch (Navigation) + jacket |
    | alice | 102 | 2026-10-30 | AwaitingValidation | helmet |
    | alice | 103 | 2026-07-15 | Shipped | boots (outside the Return Window) |
    | alice | 104 | 2026-10-25 | Cancelled | backpack |
