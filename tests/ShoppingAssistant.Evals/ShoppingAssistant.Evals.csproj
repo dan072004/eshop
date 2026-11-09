@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPublishable>false</IsPublishable>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Holds ANTHROPIC_API_KEY for local eval runs: dotnet user-secrets set ANTHROPIC_API_KEY <key> -->
+    <UserSecretsId>7d1f3c2e-5b8a-4e6f-9c0d-2a4b6e8f1c3d</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="xunit.v3.mtp-v2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\WebApp\WebApp.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="World\world.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

@@ -35,6 +35,7 @@
       "tests\\eShop.Assistant.Tools.UnitTests\\eShop.Assistant.Tools.UnitTests.csproj",
       "tests\\Identity.FunctionalTests\\Identity.FunctionalTests.csproj",
       "tests\\Mcp.FunctionalTests\\Mcp.FunctionalTests.csproj",
+      "tests\\ShoppingAssistant.Evals\\ShoppingAssistant.Evals.csproj",
       "tests\\Webhooks.FunctionalTests\\Webhooks.FunctionalTests.csproj",
       "tests\\eShop.AppHost.UnitTests\\eShop.AppHost.UnitTests.csproj"
     ]

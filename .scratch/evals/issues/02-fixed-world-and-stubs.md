@@ -36,11 +36,11 @@ See the evals spec's "The fixed world".
 
 **Status:** ready-for-agent
 
-- [ ] Fast tests through the tools library's tool functions, invoked as a model would, with JSON compared as literals:
-  - [ ] alice's `list_my_orders` returns `today` 2026-11-01 and orders 102, 104, 101, 103 in that order (newest first), with their statuses
-  - [ ] alice's `get_order(101)` returns both items with their catalog `type` and `brand`
-  - [ ] alice's `get_order(201)` returns `not_found`
-  - [ ] a signed-out `list_my_orders` returns `sign_in_required`
-  - [ ] bob's `list_my_orders` returns only 202 and 201
-- [ ] Without `ESHOP_EVALS`, a placeholder model-calling test is reported as skipped; with it and no key, it fails naming `ANTHROPIC_API_KEY`
-- [ ] `dotnet test --solution eShop.Web.slnf` runs the fast tests with no key and no Docker
+- [x] Fast tests through the tools library's tool functions, invoked as a model would, with JSON compared as literals:
+  - [x] alice's `list_my_orders` returns `today` 2026-11-01 and orders 102, 104, 101, 103 in that order (newest first), with their statuses
+  - [x] alice's `get_order(101)` returns both items with their catalog `type` and `brand`
+  - [x] alice's `get_order(201)` returns `not_found`
+  - [x] a signed-out `list_my_orders` returns `sign_in_required`
+  - [x] bob's `list_my_orders` returns only 202 and 201
+- [x] Without `ESHOP_EVALS`, a placeholder model-calling test is reported as skipped; with it and no key, it fails naming `ANTHROPIC_API_KEY`
+- [x] `dotnet test --solution eShop.Web.slnf` runs the fast tests with no key and no Docker
