@@ -30,6 +30,7 @@
   <ItemGroup>
     <None Update="World\world.json" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Cases\cases.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Judge\calibration.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- The results store defaults to <artifacts>/evals-store, wherever the build puts its artifacts. -->

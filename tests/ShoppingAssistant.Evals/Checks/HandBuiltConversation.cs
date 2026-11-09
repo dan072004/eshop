@@ -43,13 +43,20 @@ internal sealed class HandBuiltConversation
     /// <summary>Evaluates the conversation as the runner does: everything up to the last user turn, then the reply to it.</summary>
     public async Task<EvaluationMetric> EvaluateAsync(IEvaluator evaluator, EvalCase evalCase)
     {
-        var transcript = new CaseTranscript(_messages);
-        var result = await evaluator.EvaluateAsync(
-            transcript.Prompt,
-            transcript.Reply,
-            additionalContext: [new EvalCaseContext(evalCase)],
-            cancellationToken: TestContext.Current.CancellationToken);
+        var result = await EvaluateAllAsync(evaluator, evalCase);
 
         return Assert.Single(result.Metrics.Values);
+    }
+
+    /// <summary>As <see cref="EvaluateAsync"/>, with a judge, returning every metric.</summary>
+    public async Task<EvaluationResult> EvaluateAllAsync(IEvaluator evaluator, EvalCase evalCase, ChatConfiguration? judge = null)
+    {
+        var transcript = new CaseTranscript(_messages);
+        return await evaluator.EvaluateAsync(
+            transcript.Prompt,
+            transcript.Reply,
+            judge,
+            [new EvalCaseContext(evalCase)],
+            TestContext.Current.CancellationToken);
     }
 }
