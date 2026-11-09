@@ -24,7 +24,7 @@ public sealed class RubricEvaluator : IEvaluator
 
     public const string ItemPrefix = "Rubric: ";
 
-    private const string Instructions = """
+    public const string Instructions = """
         You grade one answer given by the AdventureWorks Shopping Assistant, an online outdoor-gear store's chat
         assistant, against a rubric.
 

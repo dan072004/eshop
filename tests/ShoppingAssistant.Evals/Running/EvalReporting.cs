@@ -38,23 +38,22 @@ public static class EvalReporting
         new OtherBuyersOrdersEvaluator(world),
     ];
 
-    /// <summary>The cases: every deterministic check, then the judge's rubric verdicts.</summary>
+    /// <summary>The cache both the chat model's turns and the judge's calls go through, in the results store.</summary>
+    public static IEvaluationResponseCacheProvider ResponseCacheProvider => ResponseCache.Provider(StorePath, ResponseCache.IsFresh);
+
+    /// <summary>
+    /// The cases: every deterministic check, then the judge's rubric verdicts. Each case's scenario run takes its
+    /// <see cref="CaseTranscript.CachingKeys"/> and <see cref="CaseTranscript.OriginTag"/>.
+    /// </summary>
     public static ReportingConfiguration Create(EvalWorld world, ChatConfiguration judge) =>
-        DiskBasedReportingConfiguration.Create(
-            StorePath,
-            [.. DeterministicChecks(world), new RubricEvaluator()],
-            judge,
-            enableResponseCaching: false,
-            executionName: ExecutionName);
+        Create([.. DeterministicChecks(world), new RubricEvaluator()], judge);
 
     /// <summary>The calibration set: the judge's rubric verdicts only, in scenarios named <c>judge-calibration.{id}</c>.</summary>
-    public static ReportingConfiguration CreateCalibration(ChatConfiguration judge) =>
-        DiskBasedReportingConfiguration.Create(
-            StorePath,
-            [new RubricEvaluator()],
-            judge,
-            enableResponseCaching: false,
-            executionName: ExecutionName);
+    public static ReportingConfiguration CreateCalibration(ChatConfiguration judge) => Create([new RubricEvaluator()], judge);
+
+    // The judge's calls are cached too, keyed also by the judge settings Reporting can't see.
+    private static ReportingConfiguration Create(IEnumerable<IEvaluator> evaluators, ChatConfiguration judge) =>
+        new(evaluators, new DiskBasedResultStore(StorePath), judge, ResponseCacheProvider, CachingKeys.Judge, ExecutionName);
 
     // Set by the project file from MSBuild's ArtifactsPath, so --artifacts-path moves the store too.
     private static string ArtifactsPath =>

@@ -34,15 +34,16 @@ public sealed class EvalSuiteTests(PolicyApiFixture policyApi) : IClassFixture<P
         var world = EvalWorld.Load();
         var anthropic = new AnthropicClient(new() { ApiKey = apiKey });
         using var model = anthropic.AsIChatClient(ClaudeChatPipeline.GetModelId(configuration), ClaudeChatPipeline.GetMaxOutputTokens(configuration));
-        var runner = new CaseRunner(world, policyApi, model, configuration);
+        var runner = new CaseRunner(world, policyApi, new CachedModel(model, EvalReporting.ResponseCacheProvider), configuration);
         var reporting = EvalReporting.Create(world, JudgeClient.Configuration(anthropic));
 
         List<string> failures = [];
         foreach (var evalCase in EvalCase.LoadAll())
         {
-            var transcript = await runner.RunAsync(evalCase);
+            var transcript = await runner.RunAsync(evalCase, cancellationToken: cancellationToken);
 
-            await using var scenario = await reporting.CreateScenarioRunAsync(evalCase.Id, cancellationToken: cancellationToken);
+            await using var scenario = await reporting.CreateScenarioRunAsync(
+                evalCase.Id, additionalCachingKeys: transcript.CachingKeys, additionalTags: [transcript.OriginTag], cancellationToken: cancellationToken);
             var result = await scenario.EvaluateAsync(
                 transcript.Prompt, transcript.Reply, [new EvalCaseContext(evalCase)], cancellationToken);
             JudgeFailedException.ThrowIfAny(evalCase.Id, result);
@@ -51,7 +52,7 @@ public sealed class EvalSuiteTests(PolicyApiFixture policyApi) : IClassFixture<P
                 .Where(m => m.Interpretation?.Failed == true)
                 .Select(m => $"{evalCase.Id}: {m.Name}: {m.Reason}"));
             TestContext.Current.TestOutputHelper?.WriteLine(
-                $"{evalCase.Id}:{Environment.NewLine}{transcript.Reply.Text}{Environment.NewLine}{JudgeUsage.Of(result)}");
+                $"{evalCase.Id} ({transcript.OriginTag}, {transcript.ModelCalls} model calls):{Environment.NewLine}{transcript.Reply.Text}{Environment.NewLine}{JudgeUsage.Of(result)}");
         }
 
         Assert.True(failures.Count == 0, $"Results in {EvalReporting.StorePath}{Environment.NewLine}{string.Join(Environment.NewLine, failures)}");
