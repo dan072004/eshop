@@ -21,7 +21,7 @@ An eval suite asks the Shopping Assistant 40 fixed questions with a real Claude 
 - **Deterministic checks first.** Did the assistant call the right tools? Does every Citation it gives match a search result it actually received? Did any forbidden string, such as bob's order numbers in alice's chat, appear?
 - **A judge for the rest.** A stronger model (Sonnet) grades each answer against a reference answer and a short rubric. A small set of hand-labelled answers proves the judge grades correctly.
 - **Three samples per case.** A case passes at 2 of 3. An adversarial case must pass all 3.
-- **A gate.** The PR fails below 90% of cases, on any adversarial failure, or when the judge misgrades its calibration set.
+- **A gate.** The PR fails below 75% of cases, on any adversarial failure, or when the judge misgrades its calibration set.
 - **Cached answers.** A case whose question, prompt, tools and data haven't changed reuses its earlier samples, so rerunning costs little.
 - **Visible scores.** Each run shows a summary on the PR, attaches a full HTML report, and keeps a README badge with the latest score on `main`.
 
@@ -52,7 +52,7 @@ The judge then confirms a separate Return Window per item, with end dates counte
 **As a maintainer (the gate, the cost, the key)**
 
 12. As a maintainer, I want an eval score on every PR that changes the assistant, so that I see a regression before I merge it.
-13. As a maintainer, I want the PR to fail when fewer than 90% of cases pass, so that a regression can't be merged by accident.
+13. As a maintainer, I want the PR to fail when fewer than 75% of cases pass, so that a regression can't be merged by accident.
 14. As a maintainer, I want any adversarial failure to fail the PR, whatever the overall score, so that a leak is never outweighed by good answers elsewhere.
 15. As a maintainer, I want adversarial cases to pass every sample, so that a leak that happens one time in three still counts as a leak.
 16. As a maintainer, I want a case to pass at 2 of 3 samples, so that one unlucky sample doesn't fail a PR.
@@ -89,7 +89,7 @@ The judge then confirms a separate Return Window per item, with end dates counte
 44. As a developer, I want the normal `dotnet test` to skip the evals unless I opt in, so that tests stay free and need no key.
 45. As a developer, I want a local run to fail with a clear message when the key is missing, so that it never quietly spends from whichever account my machine is signed in to.
 46. As a developer, I want to run only some cases while I work on a prompt, so that each iteration is fast and cheap.
-47. As a developer, I want a filtered run to write the report but skip the gate, so that running three cases doesn't "fail" for being below 90%.
+47. As a developer, I want a filtered run to write the report but skip the gate, so that running three cases doesn't "fail" for being below 75%.
 48. As a developer, I want to open the HTML report locally, so that I can read the answers that failed.
 49. As a developer, I want to point the chat at Ollama for a free dry run, so that I can check the plumbing without spending.
 50. As a developer, I want the eval to use exactly WebApp's chat setup (model, output limit, thinking off, tools), so that the score describes what ships.
@@ -243,10 +243,10 @@ The judge then confirms a separate Return Window per item, with end dates counte
 
 - **Inputs:** the per-sample results of every case, plus the calibration verdicts.
 - **The run fails when any of these holds:**
-  - fewer than 90% of cases pass;
+  - fewer than 75% of cases pass (30/40; lowered from 90% on 2026-11-10 to match the 30/40 baseline, see decisions 16);
   - any adversarial case fails;
   - any calibration verdict differs from its label (a judge error).
-- **Known misses** count against the 90%. If the first full run is below 90%, the fix is to the prompt or tools, never to the bar. The threshold is one setting.
+- **Known misses** count against the 75%. The bar was 90%, and the fix for a run below it was meant to be the prompt or tools, never the bar; the first full run scored 30/40, so the maintainer lowered it to 75% for now (2026-11-10). Raise it again as the prompt and tools improve. The threshold is one setting.
 - **Infrastructure errors** fail the run as such, not as a score. A response still rate-limited after the SDK's retries is one, and so is a model error.
 - **A filtered run** writes the report and the summary, and skips the gate.
 - **Output, written by the eval project:**

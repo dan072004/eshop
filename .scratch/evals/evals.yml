@@ -1,4 +1,4 @@
-# DRAFT from the evals grilling (2026-11-09); see decisions.md. Not yet in .github/workflows/.
+# DRAFT from the evals grilling (2026-11-09); see decisions.md. Superseded by .github/workflows/evals.yml (ticket 09); the comment and badge jobs are ticket 10.
 # .github/workflows/evals.yml
 name: Shopping Assistant evals
 

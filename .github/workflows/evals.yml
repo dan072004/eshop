@@ -1,0 +1,130 @@
+# The Shopping Assistant evals: 40 questions asked of a real Claude model and scored (tests/ShoppingAssistant.Evals).
+# See .scratch/evals/spec.md, "CI".
+name: Shopping Assistant evals
+
+on:
+  # No paths filter here: the check always reports, and the "Decide" step skips the evals when nothing changed.
+  # Never pull_request_target: PR code must never run with this repository's secrets.
+  pull_request:
+  push:
+    branches: [main] # runs on main seed the cache that PR runs restore
+  workflow_dispatch:
+    inputs:
+      fresh:
+        description: Ignore cached responses and sample every case again
+        type: boolean
+        default: false
+
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: evals # holds ANTHROPIC_API_KEY: a CI-only key in its own workspace, with a spend limit
+    outputs:
+      ran: ${{ steps.decide.outputs.ran }}
+    env:
+      ESHOP_EVALS_STORE: ${{ github.workspace }}/artifacts/evals-store # the results store and the response cache
+      EVALS_OUT: ${{ github.workspace }}/artifacts/evals-out # what this run uploads: summary.md, evals.json, report.html
+      DOTNET_AIEVAL_TELEMETRY_OPTOUT: 1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # a PR's merge commit and its base, to list the PR's changes
+
+      - name: Decide whether to run
+        id: decide
+        env:
+          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }} # false on fork and Dependabot PRs, which get no secrets
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          mkdir -p "$EVALS_OUT"
+          case "$EVENT" in
+            pull_request) changed=$(git diff --name-only HEAD^1 HEAD) ;; # the merge commit against its base
+            push) changed=$(git fetch --no-tags --depth=1 origin "$BEFORE" && git diff --name-only "$BEFORE" HEAD || echo "unknown") ;;
+            *) changed="" ;;
+          esac
+          # The assistant: the chat component, WebApp's chat registration, the tools, policy-api, the Policies,
+          # the eval project and this workflow. An unknown diff counts as a change.
+          assistant=$(printf '%s\n' "$changed" | grep -E '^(src/WebApp/Components/Chatbot/|src/WebApp/Extensions/|src/eShop\.Assistant\.Tools/|src/Policy\.API/|policies/|tests/ShoppingAssistant\.Evals/|\.github/workflows/evals\.yml$|unknown$)' || true)
+          if [ "$HAS_KEY" != "true" ]; then
+            echo "ran=false" >> "$GITHUB_OUTPUT"
+            echo "Evals not run: no API key on this PR." > "$EVALS_OUT/summary.md"
+          elif [ "$EVENT" = "workflow_dispatch" ] || [ -n "$assistant" ]; then
+            echo "ran=true" >> "$GITHUB_OUTPUT"
+            printf 'Assistant changes:\n%s\n' "${assistant:-(manual run)}"
+          else
+            echo "ran=false" >> "$GITHUB_OUTPUT"
+            echo "Evals not run: no assistant changes." > "$EVALS_OUT/summary.md"
+          fi
+
+      - name: Setup .NET (global.json)
+        if: steps.decide.outputs.ran == 'true'
+        uses: actions/setup-dotnet@v4
+
+      # The most recent cache visible to this run (this ref's, then the base branch's). A rerun gets a new key
+      # through run_attempt, so it restores the first attempt's store and can save its own.
+      - name: Restore the results store
+        if: steps.decide.outputs.ran == 'true' && !inputs.fresh
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.ESHOP_EVALS_STORE }}
+          key: evals-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: evals-
+
+      - name: Build
+        if: steps.decide.outputs.ran == 'true'
+        run: |
+          dotnet tool restore
+          dotnet build tests/ShoppingAssistant.Evals
+
+      # Fails when the gate fails. The project writes summary.md and evals.json at the root of the store.
+      - name: Run the evals
+        if: steps.decide.outputs.ran == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # this step only
+          ESHOP_EVALS: 1
+          ESHOP_EVALS_FRESH: ${{ inputs.fresh && '1' || '' }}
+        run: |
+          # A restored store holds the previous run's summary; this run must not show it if it writes none.
+          rm -f "$ESHOP_EVALS_STORE/summary.md" "$ESHOP_EVALS_STORE/evals.json"
+          dotnet test --project tests/ShoppingAssistant.Evals --no-build
+
+      - name: HTML report and cache cleanup
+        if: always() && steps.decide.outputs.ran == 'true'
+        run: |
+          mkdir -p "$ESHOP_EVALS_STORE"
+          for file in summary.md evals.json; do
+            if [ -f "$ESHOP_EVALS_STORE/$file" ]; then cp "$ESHOP_EVALS_STORE/$file" "$EVALS_OUT/"; fi
+          done
+          if [ ! -f "$EVALS_OUT/summary.md" ]; then
+            echo "Evals did not finish: no summary was written. See the job log." > "$EVALS_OUT/summary.md"
+          fi
+          dotnet aieval report -p "$ESHOP_EVALS_STORE" -o "$EVALS_OUT/report.html"
+          dotnet aieval clean-cache -p "$ESHOP_EVALS_STORE"
+
+      - name: Save the results store
+        if: always() && steps.decide.outputs.ran == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.ESHOP_EVALS_STORE }}
+          key: evals-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Job summary
+        if: always()
+        run: cat "$EVALS_OUT/summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the summary, badge and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evals
+          path: ${{ env.EVALS_OUT }}
+          if-no-files-found: ignore

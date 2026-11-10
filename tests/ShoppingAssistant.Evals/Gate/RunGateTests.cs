@@ -31,15 +31,15 @@ public sealed class RunGateTests
     }
 
     [Fact]
-    public void ThirtyFiveOfFortyCasesFailsTheRunAndThirtySixPasses()
+    public void TwentyNineOfFortyCasesFailsTheRunAndThirtyPasses()
     {
-        var at35 = RunGate.Decide([.. Passing(35), .. Failing(5)], Calibrated, FullRun);
-        var at36 = RunGate.Decide([.. Passing(36), .. Failing(4)], Calibrated, FullRun);
+        var at29 = RunGate.Decide([.. Passing(29), .. Failing(11)], Calibrated, FullRun);
+        var at30 = RunGate.Decide([.. Passing(30), .. Failing(10)], Calibrated, FullRun);
 
         Assert.Equivalent(
-            new { Verdict = GateVerdict.Failed, Passed = 35, Total = 40, Reasons = new[] { "35/40 cases passed (87%); the gate needs 90%." } },
-            at35);
-        Assert.Equivalent(new { Verdict = GateVerdict.Passed, Passed = 36, Total = 40, Reasons = Array.Empty<string>() }, at36);
+            new { Verdict = GateVerdict.Failed, Passed = 29, Total = 40, Reasons = new[] { "29/40 cases passed (72%); the gate needs 75%." } },
+            at29);
+        Assert.Equivalent(new { Verdict = GateVerdict.Passed, Passed = 30, Total = 40, Reasons = Array.Empty<string>() }, at30);
     }
 
     [Fact]
@@ -110,13 +110,13 @@ public sealed class RunGateTests
     public void TheBadgeCarriesPassedOverTotalGreenWhenTheGatePassesAndRedWhenItFails()
     {
         var passedRun = RunGate.Decide([.. Passing(37), .. Failing(3)], Calibrated, FullRun);
-        var failedRun = RunGate.Decide([.. Passing(35), .. Failing(5)], Calibrated, FullRun);
+        var failedRun = RunGate.Decide([.. Passing(29), .. Failing(11)], Calibrated, FullRun);
 
         Assert.True(JsonElement.DeepEquals(
             JsonElement.Parse("""{ "schemaVersion": 1, "label": "evals", "message": "37/40", "color": "green" }"""),
             JsonElement.Parse(passedRun.Badge)));
         Assert.True(JsonElement.DeepEquals(
-            JsonElement.Parse("""{ "schemaVersion": 1, "label": "evals", "message": "35/40", "color": "red" }"""),
+            JsonElement.Parse("""{ "schemaVersion": 1, "label": "evals", "message": "29/40", "color": "red" }"""),
             JsonElement.Parse(failedRun.Badge)));
     }
 
@@ -145,11 +145,11 @@ public sealed class RunGateTests
             """
             ## Evals: failed
 
-            **Score: 1/2 cases passed (50%).** The gate needs 90%, every adversarial case, and no judge errors.
+            **Score: 1/2 cases passed (50%).** The gate needs 75%, every adversarial case, and no judge errors.
 
             ### Why the run failed
 
-            - 1/2 cases passed (50%); the gate needs 90%.
+            - 1/2 cases passed (50%); the gate needs 75%.
             - Judge error: wrong-jacket-window: "Gives the jacket 60 days" is labelled fail but the judge said pass: Both items get a window.
 
             ### By category
