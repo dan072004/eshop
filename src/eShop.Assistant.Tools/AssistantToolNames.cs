@@ -13,3 +13,4 @@ public static class AssistantToolNames
     public const string SearchCatalog = "search_catalog";
 }
 // Probe for evals ticket 10 (throwaway, never merged).
+// Second probe push: the sticky comment should be edited in place.
