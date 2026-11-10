@@ -27,3 +27,4 @@ If the size or colour you want is out of stock, we cannot hold an exchange. Retu
 
 ## Price differences
 Exchanges are for the same product, so there is no price difference. If the product's price has changed since you bought it, you keep the price you paid.
+
