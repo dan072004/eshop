@@ -14,8 +14,8 @@ See the evals spec's "CI".
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-human
+**Status:** done
 
-- [ ] The CI key exists only in the `evals` environment, not as a repository secret
-- [ ] The CI workspace's spend limit is set
-- [ ] `https://raw.githubusercontent.com/dan072004/eshop/badges/evals.json` serves the initial document
+- [x] The CI key exists only in the `evals` environment, not as a repository secret
+- [x] The CI workspace's spend limit is set
+- [x] `https://raw.githubusercontent.com/dan072004/eshop/badges/evals.json` serves the initial document
