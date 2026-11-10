@@ -157,6 +157,7 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           RESULT: ${{ needs.evals.result }}
+          RAN: ${{ needs.evals.outputs.ran }}
         run: |
           marker='<!-- shopping-assistant-evals -->'
           {
@@ -168,7 +169,11 @@ jobs:
             fi
             echo
             echo "---"
-            echo "[Run log and HTML report]($RUN_URL) (the report is in the run's \`evals\` artifact)."
+            if [ "$RAN" = "true" ]; then
+              echo "[Run log]($RUN_URL). The HTML report is in the run's \`evals\` artifact."
+            else
+              echo "[Run log]($RUN_URL)."
+            fi
           } > body.md
           id=$(gh api --paginate "repos/$REPO/issues/$PR/comments" \
             --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | head -n 1)
