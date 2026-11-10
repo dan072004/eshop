@@ -117,7 +117,7 @@ public enum SampleOrigin
 /// <summary>One sample of one case: the checks and rubric items it failed, or why it has no result.</summary>
 /// <param name="Iteration">The sample's iteration name: 1, 2 or 3.</param>
 /// <param name="Failures">Every failed deterministic check and rubric item, with its reason; empty when the sample passed.</param>
-/// <param name="Usage">The tokens the chat model and the judge reported for this sample.</param>
+/// <param name="Usage">The tokens of this sample's chat and judge calls that reached a model; replayed calls cost nothing.</param>
 /// <param name="InfrastructureError">Why the sample has no answer or no verdict (a failed model or judge call).</param>
 /// <param name="KnownMiss">The case's <c>knownMiss</c> note.</param>
 public sealed record SampleResult(

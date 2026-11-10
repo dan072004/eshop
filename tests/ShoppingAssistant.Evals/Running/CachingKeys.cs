@@ -29,7 +29,7 @@ public static partial class CachingKeys
         "tools:" + Hash(JsonSerializer.Serialize(tools.Select(t => new
         {
             t.Name,
-            t.Description,
+            Description = Lf(t.Description),
             Schema = (t as AIFunctionDeclaration)?.JsonSchema,
         }))),
         "case:" + Hash(CaseEntry(caseFile, caseId)),
@@ -47,7 +47,7 @@ public static partial class CachingKeys
             JudgeClient.ModelId,
             Effort = JudgeClient.Effort.ToString(),
             JudgeClient.MaxOutputTokens,
-            RubricEvaluator.Instructions,
+            Instructions = Lf(RubricEvaluator.Instructions),
         })),
     ];
 
@@ -65,5 +65,11 @@ public static partial class CachingKeys
     [GeneratedRegex("""\s*,\s*"knownMiss"\s*:\s*"(?:[^"\\]|\\.)*"|"knownMiss"\s*:\s*"(?:[^"\\]|\\.)*"\s*,\s*""")]
     private static partial Regex KnownMissNote();
 
-    private static string Hash(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+    // Hashed with LF line endings, so a CRLF checkout (git's autocrlf on Windows) gets the same keys as CI's LF one:
+    // the case and world files and the judge's instructions, a raw string literal, follow the checkout's line endings.
+    private static string Hash(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Lf(value))));
+
+    // Strings inside a serialized value are escaped (a CR becomes \r), so those are normalised before serializing.
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(text))]
+    private static string? Lf(string? text) => text?.ReplaceLineEndings("\n");
 }

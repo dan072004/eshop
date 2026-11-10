@@ -79,6 +79,17 @@ public sealed class CachingKeysTests
     }
 
     [Fact]
+    public void ACrlfCheckoutGivesTheSameKeysAsAnLfOne()
+    {
+        const string caseFile = "{ \"cases\": [\n  {\n    \"id\": \"returns-gps-watch-last-order\",\n    \"turns\": [\"what's the return window for my last order?\"]\n  }\n] }\n";
+        const string worldFile = "{\n  \"now\": \"2026-11-01T12:00:00Z\",\n  \"buyers\": []\n}\n";
+
+        Assert.Equal(
+            Keys(caseFile: caseFile, worldFile: worldFile),
+            Keys(caseFile: caseFile.ReplaceLineEndings("\r\n"), worldFile: worldFile.ReplaceLineEndings("\r\n")));
+    }
+
+    [Fact]
     public void ChangingTheWorldChangesTheKeys()
     {
         var edited = WorldFile.Replace("2026-11-01", "2026-11-02", StringComparison.Ordinal);

@@ -130,7 +130,8 @@ public sealed class RunGateTests
         [
             new("returns-window", CaseCategory.Policy, "1", [], usage),
             new("returns-window", CaseCategory.Policy, "2", [], usage),
-            new("returns-window", CaseCategory.Policy, "3", [], usage, Origin: SampleOrigin.Cached),
+            // Replayed chat turns, but a judge call that reached the model, as after a change to the judge.
+            new("returns-window", CaseCategory.Policy, "3", [], [new("claude-sonnet-5-5", 2_000, 100)], Origin: SampleOrigin.Cached),
             new("returns-gps-watch-last-order", CaseCategory.Order, "1", [], usage, KnownMiss: "Cites only the general window."),
             new("returns-gps-watch-last-order", CaseCategory.Order, "2", [citationMissing, wrongDays], usage, KnownMiss: "Cites only the general window."),
             new("returns-gps-watch-last-order", CaseCategory.Order, "3", [citationMissing], usage, KnownMiss: "Cites only the general window."),
@@ -171,10 +172,10 @@ public sealed class RunGateTests
             | Model | Input tokens | Output tokens | Estimated cost |
             |---|---:|---:|---:|
             | claude-haiku-4-5-20251001 | 5,000 | 1,000 | $0.010 |
-            | claude-sonnet-5-5 | 11,000 | 600 | $0.028 |
-            | **Total** | 16,000 | 1,600 | **$0.038** |
+            | claude-sonnet-5-5 | 13,000 | 700 | $0.033 |
+            | **Total** | 18,000 | 1,700 | **$0.043** |
 
-            Fresh samples and the calibration set only; a cached sample cost nothing this run.
+            Only calls that reached a model count; a call replayed from the cache cost nothing this run.
 
             ### Samples
 

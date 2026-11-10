@@ -30,20 +30,33 @@ public static class CalibrationRun
         List<TokenUsage> usage = [];
         foreach (var answer in JudgeCalibration.LoadAll())
         {
-            await using var scenario = await reporting.CreateScenarioRunAsync(
-                JudgeCalibration.ScenarioPrefix + answer.Id, cancellationToken: cancellationToken);
-            var result = await scenario.EvaluateAsync(
-                answer.Prompt, answer.Reply, [new EvalCaseContext(answer.Case)], cancellationToken);
-            usage.AddRange(JudgeUsage.Tokens(result));
+            var scenarioName = JudgeCalibration.ScenarioPrefix + answer.Id;
+            string executionName, iterationName;
+            JudgeFailedException? failed = null;
+            await using (var scenario = await reporting.CreateScenarioRunAsync(scenarioName, cancellationToken: cancellationToken))
+            {
+                (executionName, iterationName) = (scenario.ExecutionName, scenario.IterationName);
+                var result = await scenario.EvaluateAsync(
+                    answer.Prompt, answer.Reply, [new EvalCaseContext(answer.Case)], cancellationToken);
 
-            // Compare re-interprets the rubric metrics before the scenario is stored, so the report shows judge errors.
-            try
-            {
-                judgeErrors.AddRange(JudgeCalibration.Compare(answer, result));
+                // Compare re-interprets the rubric metrics before the scenario is stored, so the report shows judge errors.
+                try
+                {
+                    judgeErrors.AddRange(JudgeCalibration.Compare(answer, result));
+                }
+                catch (JudgeFailedException e)
+                {
+                    failed = e;
+                }
             }
-            catch (JudgeFailedException e)
+
+            // The stored scenario records each judge call and whether the cache answered it; only misses cost tokens.
+            var stored = await reporting.ResultStore.ReadResultsAsync(executionName, scenarioName, iterationName, cancellationToken)
+                .SingleAsync(cancellationToken);
+            usage.AddRange(JudgeUsage.Tokens(stored));
+            if (failed is not null)
             {
-                return new CalibrationOutcome(judgeErrors, usage, e.Message);
+                return new CalibrationOutcome(judgeErrors, usage, failed.Message);
             }
         }
 

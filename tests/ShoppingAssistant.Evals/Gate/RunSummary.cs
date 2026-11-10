@@ -73,11 +73,10 @@ internal static class RunSummary
         return summary.ToString();
     }
 
-    // What this run spent: a cached sample replays stored answers, so only fresh samples and the calibration count.
+    // What this run spent: each sample and the calibration set carry only the tokens of calls that reached a model.
     private static void AppendCost(StringBuilder summary, IReadOnlyList<CaseResult> cases, CalibrationOutcome? calibration)
     {
         var byModel = cases.SelectMany(c => c.Samples)
-            .Where(s => s.Origin == SampleOrigin.Fresh)
             .SelectMany(s => s.Usage)
             .Concat(calibration?.Usage ?? [])
             .GroupBy(u => u.Model)
@@ -94,7 +93,7 @@ internal static class RunSummary
         var total = byModel.Select(ModelPrices.Cost).Where(c => c is not null).Sum();
         summary.Append(CultureInfo.InvariantCulture,
             $"| **Total** | {Tokens(byModel.Sum(u => u.InputTokens))} | {Tokens(byModel.Sum(u => u.OutputTokens))} | **{Dollars(total)}** |\n\n");
-        summary.Append("Fresh samples and the calibration set only; a cached sample cost nothing this run.\n\n");
+        summary.Append("Only calls that reached a model count; a call replayed from the cache cost nothing this run.\n\n");
     }
 
     private static string Headline(GateVerdict verdict) => verdict switch

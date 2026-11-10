@@ -2,6 +2,7 @@
 using eShop.Assistant.Tools;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
+using Microsoft.Extensions.AI.Evaluation.Reporting;
 using ShoppingAssistant.Evals.Cases;
 using ShoppingAssistant.Evals.Checks;
 using ShoppingAssistant.Evals.Gate;
@@ -170,14 +171,12 @@ public static class JudgeUsage
             ? "judge " + string.Join(", ", metadata.OrderBy(m => m.Key, StringComparer.Ordinal).Select(m => $"{m.Key}={m.Value}"))
             : "judge: no usage recorded";
 
-    /// <summary>The judge call's tokens, as Reporting records them on each rubric metric; none when it recorded none.</summary>
-    public static IReadOnlyList<TokenUsage> Tokens(EvaluationResult result) =>
-        result.Metrics.Values.FirstOrDefault(m => m.Name.StartsWith(RubricEvaluator.ItemPrefix, StringComparison.Ordinal))?.Metadata is { } metadata
-            && metadata.TryGetValue("eval-model", out var model)
-            && metadata.TryGetValue("eval-input-tokens", out var inputTokens)
-            && metadata.TryGetValue("eval-output-tokens", out var outputTokens)
-            && long.TryParse(inputTokens, System.Globalization.CultureInfo.InvariantCulture, out var input)
-            && long.TryParse(outputTokens, System.Globalization.CultureInfo.InvariantCulture, out var output)
-            ? [new TokenUsage(model, input, output)]
-            : [];
+    /// <summary>
+    /// The tokens of each judge call in a stored scenario that reached the model. Reporting records every call the
+    /// scenario's chat client made, with whether the response cache answered it; a replayed call cost nothing.
+    /// </summary>
+    public static IReadOnlyList<TokenUsage> Tokens(ScenarioRunResult stored) =>
+        [.. (stored.ChatDetails?.TurnDetails ?? [])
+            .Where(t => t.CacheHit != true && t.Usage is not null)
+            .Select(t => new TokenUsage(t.Model ?? "unknown", t.Usage!.InputTokenCount ?? 0, t.Usage.OutputTokenCount ?? 0))];
 }

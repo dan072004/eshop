@@ -66,35 +66,56 @@ public static class ResponseCache
 /// </summary>
 public sealed class CachedModel(IChatClient model, IEvaluationResponseCacheProvider cache)
 {
-    /// <summary>A cached client for one sample, which counts the calls that reach the model.</summary>
+    /// <summary>A cached client for one sample, which counts the calls that reach the model and records their tokens.</summary>
     public async Task<CachedSample> OpenAsync(
         string caseId, string iterationName, IEnumerable<string> cachingKeys, CancellationToken cancellationToken)
     {
-        var calls = new ModelCallCounter(model);
+        var calls = new ModelCalls(model);
 
         // Only the run's chat client is used: the run is never evaluated, so it writes no result to the store.
         var answers = new ReportingConfiguration([], NoResults.Instance, new ChatConfiguration(calls), cache);
         var run = await answers.CreateScenarioRunAsync(caseId, iterationName, cachingKeys, cancellationToken: cancellationToken);
-        return new CachedSample(run.ChatConfiguration!.ChatClient, () => calls.Calls);
+        return new CachedSample(run.ChatConfiguration!.ChatClient, () => calls.Count, () => calls.Usage);
     }
 
-    private sealed class ModelCallCounter(IChatClient inner) : DelegatingChatClient(inner)
+    // Below the cache, so it sees only the calls the cache missed: those are the ones that reached, and cost, the model.
+    private sealed class ModelCalls(IChatClient inner) : DelegatingChatClient(inner)
     {
-        private int _calls;
+        private readonly List<Gate.TokenUsage> _usage = [];
+        private int _count;
 
-        public int Calls => Volatile.Read(ref _calls);
+        public int Count => Volatile.Read(ref _count);
 
-        public override Task<ChatResponse> GetResponseAsync(
+        public IReadOnlyList<Gate.TokenUsage> Usage
+        {
+            get
+            {
+                lock (_usage)
+                {
+                    return [.. _usage];
+                }
+            }
+        }
+
+        public override async Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
-            Interlocked.Increment(ref _calls);
-            return base.GetResponseAsync(messages, options, cancellationToken);
+            Interlocked.Increment(ref _count);
+            var response = await base.GetResponseAsync(messages, options, cancellationToken);
+            if (response.Usage is { } usage)
+            {
+                lock (_usage)
+                {
+                    _usage.Add(new(response.ModelId ?? options?.ModelId ?? "unknown", usage.InputTokenCount ?? 0, usage.OutputTokenCount ?? 0));
+                }
+            }
+            return response;
         }
 
         public override IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
             IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
-            Interlocked.Increment(ref _calls);
+            Interlocked.Increment(ref _count);
             return base.GetStreamingResponseAsync(messages, options, cancellationToken);
         }
 
@@ -128,10 +149,13 @@ public sealed class CachedModel(IChatClient model, IEvaluationResponseCacheProvi
     }
 }
 
-/// <summary>One sample's cached chat client, and how many of its calls reached the model so far.</summary>
-public sealed class CachedSample(IChatClient chatClient, Func<int> modelCalls)
+/// <summary>One sample's cached chat client, and how many of its calls reached the model so far, and their tokens.</summary>
+public sealed class CachedSample(IChatClient chatClient, Func<int> modelCalls, Func<IReadOnlyList<Gate.TokenUsage>> usage)
 {
     public IChatClient ChatClient { get; } = chatClient;
 
     public int ModelCalls => modelCalls();
+
+    /// <summary>The tokens each call that reached the model reported; a replayed call cost nothing.</summary>
+    public IReadOnlyList<Gate.TokenUsage> Usage => usage();
 }

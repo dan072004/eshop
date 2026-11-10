@@ -108,7 +108,10 @@ jobs:
             echo "Evals did not finish: no summary was written. See the job log." > "$EVALS_OUT/summary.md"
           fi
           dotnet aieval report -p "$ESHOP_EVALS_STORE" -o "$EVALS_OUT/report.html"
+          # The store is saved under a new key each run, so prune it: expired cache entries, and every run's
+          # results but the 5 most recent, which the next report shows side by side.
           dotnet aieval clean-cache -p "$ESHOP_EVALS_STORE"
+          dotnet aieval clean-results -p "$ESHOP_EVALS_STORE" -n 5
 
       - name: Save the results store
         if: always() && steps.decide.outputs.ran == 'true'
