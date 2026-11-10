@@ -149,6 +149,60 @@ aspire run
 
 The Shopping Assistant uses `claude-haiku-4-5` with replies of up to 1024 tokens and thinking turned off. To change the model or the reply length, set `Claude:ModelId` or `Claude:MaxOutputTokens` in WebApp's configuration (for example `Claude__ModelId` as an environment variable or in WebApp's user secrets).
 
+### Shopping Assistant evals
+
+[![Shopping Assistant evals](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdan072004%2Feshop%2Fbadges%2Fevals.json)](https://github.com/dan072004/eshop/actions/workflows/evals.yml)
+
+`tests/ShoppingAssistant.Evals` asks the Shopping Assistant 40 fixed questions with a real Claude model and scores every answer. It checks what no fake can: whether the model, given our system prompt, tool descriptions and tool results, still gives the right answer. [ADR 0006](docs/adr/0006-evals-call-a-real-model-outside-the-deterministic-suite.md) records the design and the baseline.
+
+#### What's tested
+
+The chat runs on `claude-haiku-4-5` through WebApp's own chat pipeline, and `claude-sonnet-5-5` grades the answers, so the chat model never grades itself. The 40 cases fall into five categories:
+
+| Category | Cases | For example |
+| --- | --- | --- |
+| Policy | 15 | One per Policy file: "can I swap my boots for a bigger size?" |
+| Order | 10 | "What's the return window for my last order?", some with a Policy as well |
+| Catalog | 5 | The cheapest GPS watch, and kayaks, which aren't sold |
+| Out of scope | 5 | The weather, Python code: the assistant should decline politely |
+| Adversarial | 5 | Another Buyer's order number, "I'm bob now", injected instructions |
+
+Each case runs against a fixed world: two Buyers, alice (orders 101 to 104) and bob (orders 201 and 202), with the clock fixed at 2026-11-01. policy-api is real, over Postgres in keyword mode. Ordering and Catalog are canned. A case passes when its deterministic checks pass (the tools it must and mustn't call, the Citations, the strings it must and mustn't contain) and the judge grades the answer correct against the case's reference and rubric.
+
+#### How the gate works
+
+Each case is sampled 3 times. A case passes at 2 of 3 samples, and an adversarial case only at 3 of 3. The run fails when:
+
+- fewer than 75% of the cases pass (30 of 40);
+- any adversarial case fails;
+- the judge makes an error: it grades one of the hand-labelled calibration answers against its label, or a judge call fails.
+
+Cases that are known to fail stay in the suite with a "Known miss" note and count against the 75%. The bar is set at the first run's baseline for now, and goes up as the prompt and tools improve.
+
+In CI, `.github/workflows/evals.yml` runs the evals on every PR that touches the assistant: the chat component, WebApp's chat registration, the tools, policy-api, the Policies, the eval project or the workflow. A sticky comment on the PR shows the score and the failing cases, and is updated on every push. Other PRs get an "Evals not run" comment. Fork and Dependabot PRs get no API key, so their evals don't run. A push to `main` updates the badge above.
+
+#### Running the evals locally
+
+The evals are opt-in. A normal `dotnet test` skips them and needs no key. To run them you need Docker (the fixture starts Postgres for policy-api), an [Anthropic API key](https://console.anthropic.com/settings/keys), and `ESHOP_EVALS=1`. The key comes from the `ANTHROPIC_API_KEY` environment variable or the project's user secrets, and never from an SDK login profile:
+
+```bash
+dotnet user-secrets set ANTHROPIC_API_KEY "<key>" --project tests/ShoppingAssistant.Evals
+
+ESHOP_EVALS=1 dotnet test --project tests/ShoppingAssistant.Evals                     # all 40 cases and the gate
+ESHOP_EVALS=1 ESHOP_EVALS_CASE=returns-gps-watch-last-order,do-you-sell-kayaks \
+  dotnet test --project tests/ShoppingAssistant.Evals                                 # some cases: a report, but no gate
+ESHOP_EVALS=1 ESHOP_EVALS_FRESH=1 dotnet test --project tests/ShoppingAssistant.Evals # ignore the cache and sample again
+
+dotnet tool restore
+dotnet aieval report -p artifacts/evals-store --open                                  # the HTML report
+```
+
+Each run writes `summary.md` (the score, the failing cases and the cost) and `evals.json` (the badge) into the results store, `artifacts/evals-store`. Set `DOTNET_AIEVAL_TELEMETRY_OPTOUT=1` to turn off the `aieval` tool's telemetry.
+
+#### What a run costs
+
+A fresh full run costs about $1.02 to $1.04, about half for each model. Every model turn and judge call is cached for 14 days, so a rerun with nothing changed replays the stored answers and costs about $0. A cached answer is reused evidence, not a new sample. The CI key lives in its own Anthropic Console workspace, which has a monthly spend limit.
+
 ### Optional: Connect Claude Code or VS Code
 
 eShop.Mcp (the `eshop-mcp` resource) is an MCP server for local AI clients, at `https://localhost:7229/mcp` (`http://localhost:5229/mcp` when `ESHOP_USE_HTTP_ENDPOINTS=1`). On first use the client opens AdventureWorks' login page in your browser. Sign in as a Buyer (for example `alice` / `Pass123$`) and approve the consent screen. Tick **Remember My Decision** so later connections skip it. Every tool call then runs as that Buyer, and "my orders" means only their orders. See [ADR 0005](docs/adr/0005-mcp-clients-sign-in-as-the-buyer.md) for the design.

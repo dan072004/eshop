@@ -128,3 +128,94 @@ jobs:
           name: evals
           path: ${{ env.EVALS_OUT }}
           if-no-files-found: ignore
+
+  # The sticky PR comment: summary.md, posted once and edited in place on later runs. A separate job so the token
+  # that can write to the PR never shares a job with the key, and no PR code runs here (nothing is checked out).
+  # Only PRs from this repository: a fork's token can't comment, and Dependabot's is read-only.
+  comment:
+    needs: evals
+    if: >-
+      !cancelled() && github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Download the summary
+        uses: actions/download-artifact@v4
+        continue-on-error: true # a run that uploaded nothing still gets a comment
+        with:
+          name: evals
+          path: evals-out
+
+      - name: Post or update the comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RESULT: ${{ needs.evals.result }}
+        run: |
+          marker='<!-- shopping-assistant-evals -->'
+          {
+            echo "$marker"
+            if [ -f evals-out/summary.md ]; then
+              head -c 60000 evals-out/summary.md # a comment holds at most 65,536 characters
+            else
+              echo "Evals did not finish (job result: $RESULT): no summary was uploaded."
+            fi
+            echo
+            echo "---"
+            echo "[Run log and HTML report]($RUN_URL) (the report is in the run's \`evals\` artifact)."
+          } > body.md
+          id=$(gh api --paginate "repos/$REPO/issues/$PR/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | head -n 1)
+          if [ -n "$id" ]; then
+            gh api --method PATCH "repos/$REPO/issues/comments/$id" -F body=@body.md --jq .html_url
+          else
+            gh api --method POST "repos/$REPO/issues/$PR/comments" -F body=@body.md --jq .html_url
+          fi
+
+  # The README badge: on a push to main where the evals ran, evals.json goes to the badges branch (an orphan branch
+  # holding only that file), which shields.io reads. An unchanged badge commits nothing.
+  badge:
+    needs: evals
+    if: >-
+      !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      && needs.evals.outputs.ran == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Download the badge
+        uses: actions/download-artifact@v4
+        with:
+          name: evals
+          path: evals-out
+
+      - uses: actions/checkout@v4
+        with:
+          ref: badges
+          path: badges
+
+      - name: Commit evals.json if it changed
+        working-directory: badges
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          if [ ! -f ../evals-out/evals.json ]; then
+            echo "::notice::No evals.json: the run didn't finish, so the badge keeps its last score."
+            exit 0
+          fi
+          cp ../evals-out/evals.json evals.json
+          if git diff --quiet -- evals.json; then
+            echo "The badge is unchanged: nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Evals badge: $(jq -r .message evals.json), from $SHA" -- evals.json
+          git push origin HEAD:badges
