@@ -36,3 +36,4 @@ When considering contributions, we're guided by several principles that align wi
 ## Code of Conduct
 
 To ensure a welcoming and positive environment for everyone, please adhere to our Code of Conduct. Respectful collaboration is key to a successful project.
+
