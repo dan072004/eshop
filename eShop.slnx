@@ -37,6 +37,7 @@
     <Project Path="tests/eShop.Assistant.Tools.UnitTests/eShop.Assistant.Tools.UnitTests.csproj" />
     <Project Path="tests/Identity.FunctionalTests/Identity.FunctionalTests.csproj" />
     <Project Path="tests/Mcp.FunctionalTests/Mcp.FunctionalTests.csproj" />
+    <Project Path="tests/ShoppingAssistant.Evals/ShoppingAssistant.Evals.csproj" />
     <Project Path="tests/Webhooks.FunctionalTests/Webhooks.FunctionalTests.csproj" />
     <Project Path="tests/eShop.AppHost.UnitTests/eShop.AppHost.UnitTests.csproj" />
     <Project Path="tests/ClientApp.UnitTests/ClientApp.UnitTests.csproj" />

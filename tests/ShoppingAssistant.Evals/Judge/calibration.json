@@ -1,0 +1,171 @@
+{
+  "$comment": "The judge's calibration set: fixed answers, each labelled with the verdict every rubric item should get, written from the Policy files and World/world.json. Some answers are correct; others are subtly wrong. Any verdict that differs from its label is a judge error. Fix a judge error by rewording the rubric item first, then by raising the judge's effort; never by relabelling an answer to match the judge. The fields are documented on CalibrationAnswer.",
+  "answers": [
+    {
+      "id": "return-window-correct",
+      "category": "order",
+      "note": "Correct: a separate window per item, both counted from order 101's Order Date (2026-10-31).",
+      "turns": ["what's the return window for my last order?"],
+      "policySections": [
+        { "citation": "Returns Exceptions › GPS watches, navigators and bike computers", "text": "Navigation electronics have a **30-day** return window from the order date, not 60 days. They must come back with the charger, cables, manuals and original box. Remove any personal data and unpair the device from your account before you send it." },
+        { "citation": "Returns Policy › Return window", "text": "You can return most items within **60 days** of the order date for a full refund. The order date is the date you placed the order, shown in **My orders**. For example, an order placed on October 3 can be returned until December 2." }
+      ],
+      "reference": "Your last order is order 101, placed on October 31, 2026. The VenturePro GPS Watch is navigation electronics, so it has a 30-day return window, until November 30, 2026 (Returns Exceptions › GPS watches, navigators and bike computers). The Frostbite Insulated Jacket has the standard 60-day window, until December 30, 2026 (Returns Policy › Return window).",
+      "answer": "Your last order is **order 101**, placed on October 31, 2026. The two items have different return windows:\n\n- **VenturePro GPS Watch**: 30 days, so you can return it until **2026-11-30**. Send it back with the charger, cables, manuals and original box (Returns Exceptions › GPS watches, navigators and bike computers).\n- **Frostbite Insulated Jacket**: the standard 60 days, until **2026-12-30** (Returns Policy › Return window).",
+      "rubric": [
+        { "item": "Gives a separate Return Window per item: 30 days for the GPS watch and 60 days for the jacket", "passes": true },
+        { "item": "End dates are counted from the Order Date (2026-10-31): November 30, 2026 for the watch and December 30, 2026 for the jacket", "passes": true }
+      ]
+    },
+    {
+      "id": "return-window-counted-from-today",
+      "category": "order",
+      "note": "Subtly wrong: the day counts are right, but both end dates are counted from today (2026-11-01), not the Order Date, so each is one day late.",
+      "turns": ["what's the return window for my last order?"],
+      "policySections": [
+        { "citation": "Returns Exceptions › GPS watches, navigators and bike computers", "text": "Navigation electronics have a **30-day** return window from the order date, not 60 days. They must come back with the charger, cables, manuals and original box. Remove any personal data and unpair the device from your account before you send it." },
+        { "citation": "Returns Policy › Return window", "text": "You can return most items within **60 days** of the order date for a full refund. The order date is the date you placed the order, shown in **My orders**. For example, an order placed on October 3 can be returned until December 2." }
+      ],
+      "reference": "Your last order is order 101, placed on October 31, 2026. The VenturePro GPS Watch is navigation electronics, so it has a 30-day return window, until November 30, 2026 (Returns Exceptions › GPS watches, navigators and bike computers). The Frostbite Insulated Jacket has the standard 60-day window, until December 30, 2026 (Returns Policy › Return window).",
+      "answer": "Your last order is order 101. Starting from today:\n\n- **VenturePro GPS Watch**: 30 days, until **December 1, 2026** (Returns Exceptions › GPS watches, navigators and bike computers).\n- **Frostbite Insulated Jacket**: 60 days, until **December 31, 2026** (Returns Policy › Return window).",
+      "rubric": [
+        { "item": "Gives a separate Return Window per item: 30 days for the GPS watch and 60 days for the jacket", "passes": true },
+        { "item": "End dates are counted from the Order Date (2026-10-31): November 30, 2026 for the watch and December 30, 2026 for the jacket", "passes": false }
+      ]
+    },
+    {
+      "id": "return-window-watch-given-60-days",
+      "category": "order",
+      "note": "Subtly wrong: the GPS watch is given the standard 60 days, missing the navigation electronics exception, so its end date is wrong too.",
+      "turns": ["what's the return window for my last order?"],
+      "policySections": [
+        { "citation": "Returns Exceptions › GPS watches, navigators and bike computers", "text": "Navigation electronics have a **30-day** return window from the order date, not 60 days. They must come back with the charger, cables, manuals and original box. Remove any personal data and unpair the device from your account before you send it." },
+        { "citation": "Returns Policy › Return window", "text": "You can return most items within **60 days** of the order date for a full refund. The order date is the date you placed the order, shown in **My orders**. For example, an order placed on October 3 can be returned until December 2." }
+      ],
+      "reference": "Your last order is order 101, placed on October 31, 2026. The VenturePro GPS Watch is navigation electronics, so it has a 30-day return window, until November 30, 2026 (Returns Exceptions › GPS watches, navigators and bike computers). The Frostbite Insulated Jacket has the standard 60-day window, until December 30, 2026 (Returns Policy › Return window).",
+      "answer": "Order 101 was placed on October 31, 2026. Both the VenturePro GPS Watch and the Frostbite Insulated Jacket can be returned within 60 days of the order date, so until **December 30, 2026** (Returns Policy › Return window).",
+      "rubric": [
+        { "item": "Gives a separate Return Window per item: 30 days for the GPS watch and 60 days for the jacket", "passes": false },
+        { "item": "End dates are counted from the Order Date (2026-10-31): November 30, 2026 for the watch and December 30, 2026 for the jacket", "passes": false }
+      ]
+    },
+    {
+      "id": "helmet-return-correct",
+      "category": "policy",
+      "note": "Correct: both helmet rules, each cited with the Policy Section that states it.",
+      "turns": ["can I return a bike helmet?"],
+      "policySections": [
+        { "citation": "Returns Exceptions › Helmets", "text": "Bike helmets **cannot be returned once worn outside**, or after any impact, however small. Unworn helmets with tags and packaging can be returned within **60 days**. A helmet that was in a crash may qualify for our **Crash Replacement** discount; see **Warranty Overview**." },
+        { "citation": "Returns Policy › Condition of returned items", "text": "Returned items must be:\n- Unused, unwashed and free of wear outside the home.\n- In their original packaging, with all tags, labels and accessories attached.\n\nItems that come back used or incomplete may be refused or refunded only in part. Some categories have stricter rules; see **Returns Exceptions**." }
+      ],
+      "reference": "Yes, if it is unworn: an unworn helmet with its tags and packaging can be returned within 60 days of the order date. A helmet can't be returned once it has been worn outside or after any impact, however small (Returns Exceptions › Helmets).",
+      "answer": "Yes, as long as it hasn't been used. An **unworn** helmet with its tags and packaging can be returned within **60 days** of the order date. Once a helmet has been **worn outside**, or after any impact, it can't be returned (Returns Exceptions › Helmets).",
+      "rubric": [
+        { "item": "Says a helmet can't be returned once worn outside or after any impact", "passes": true },
+        { "item": "Says an unworn helmet with tags and packaging can be returned within 60 days", "passes": true },
+        { "item": "Cites each rule it states with the Policy Section that states that rule", "passes": true }
+      ]
+    },
+    {
+      "id": "helmet-return-cites-the-wrong-section",
+      "category": "policy",
+      "note": "Subtly wrong: the rules are right, but the helmet rule is cited to Returns Policy › Condition of returned items, a Section that was returned but says nothing about helmets.",
+      "turns": ["can I return a bike helmet?"],
+      "policySections": [
+        { "citation": "Returns Exceptions › Helmets", "text": "Bike helmets **cannot be returned once worn outside**, or after any impact, however small. Unworn helmets with tags and packaging can be returned within **60 days**. A helmet that was in a crash may qualify for our **Crash Replacement** discount; see **Warranty Overview**." },
+        { "citation": "Returns Policy › Condition of returned items", "text": "Returned items must be:\n- Unused, unwashed and free of wear outside the home.\n- In their original packaging, with all tags, labels and accessories attached.\n\nItems that come back used or incomplete may be refused or refunded only in part. Some categories have stricter rules; see **Returns Exceptions**." }
+      ],
+      "reference": "Yes, if it is unworn: an unworn helmet with its tags and packaging can be returned within 60 days of the order date. A helmet can't be returned once it has been worn outside or after any impact, however small (Returns Exceptions › Helmets).",
+      "answer": "Yes, as long as it hasn't been used. An unworn helmet with its tags and packaging can be returned within 60 days of the order date, but a helmet that has been worn outside or taken any impact can't be returned (Returns Policy › Condition of returned items).",
+      "rubric": [
+        { "item": "Says a helmet can't be returned once worn outside or after any impact", "passes": true },
+        { "item": "Says an unworn helmet with tags and packaging can be returned within 60 days", "passes": true },
+        { "item": "Cites each rule it states with the Policy Section that states that rule", "passes": false }
+      ]
+    },
+    {
+      "id": "unshipped-order-correct",
+      "category": "order",
+      "note": "Correct: order 102 is AwaitingValidation, so it can't be returned yet and can still be cancelled.",
+      "turns": ["can I return the helmet from order 102?"],
+      "policySections": [
+        { "citation": "Returns Policy › How to start a return", "text": "1. Email support@adventureworks.example with your order number (shown in **My orders**) and the items you want to return.\n2. We reply within 1 business day with a prepaid return label.\n3. Print the label and drop the parcel at any carrier location.\n\nYou can only return an order once its status is **Shipped**. If your order has not been paid yet, cancel it instead; see **Order Cancellation**." },
+        { "citation": "Order Cancellation and Changes › When you can cancel", "text": "You can cancel an order **until it is paid**. That means while its status is **Submitted**, **Awaiting validation** or **Stock confirmed**.\n\nOnce an order is **Paid** or **Shipped**, it can no longer be cancelled. Wait for it to arrive and return it under the **Returns Policy** instead.\n\nPayment usually happens within minutes of checkout, so cancel as soon as possible." }
+      ],
+      "reference": "Not yet. Order 102 (the Trailblazer Bike Helmet) is still Awaiting validation, and an order can only be returned once it has shipped (Returns Policy › How to start a return). Because it hasn't been paid yet, you can cancel it instead from My orders (Order Cancellation and Changes › When you can cancel).",
+      "answer": "Not yet: order 102 is still **Awaiting validation**, and an order can only be returned once its status is **Shipped** (Returns Policy › How to start a return). It hasn't been paid yet, though, so if you no longer want the helmet you can **cancel** the order from **My orders** (Order Cancellation and Changes › When you can cancel).",
+      "rubric": [
+        { "item": "Says order 102 can't be returned yet because it hasn't shipped", "passes": true },
+        { "item": "Says order 102 can still be cancelled because it hasn't been paid", "passes": true }
+      ]
+    },
+    {
+      "id": "unshipped-order-says-too-late-to-cancel",
+      "category": "order",
+      "note": "Subtly wrong: right that it can't be returned yet, but says an order Awaiting validation can no longer be cancelled.",
+      "turns": ["can I return the helmet from order 102?"],
+      "policySections": [
+        { "citation": "Returns Policy › How to start a return", "text": "1. Email support@adventureworks.example with your order number (shown in **My orders**) and the items you want to return.\n2. We reply within 1 business day with a prepaid return label.\n3. Print the label and drop the parcel at any carrier location.\n\nYou can only return an order once its status is **Shipped**. If your order has not been paid yet, cancel it instead; see **Order Cancellation**." },
+        { "citation": "Order Cancellation and Changes › When you can cancel", "text": "You can cancel an order **until it is paid**. That means while its status is **Submitted**, **Awaiting validation** or **Stock confirmed**.\n\nOnce an order is **Paid** or **Shipped**, it can no longer be cancelled. Wait for it to arrive and return it under the **Returns Policy** instead.\n\nPayment usually happens within minutes of checkout, so cancel as soon as possible." }
+      ],
+      "reference": "Not yet. Order 102 (the Trailblazer Bike Helmet) is still Awaiting validation, and an order can only be returned once it has shipped (Returns Policy › How to start a return). Because it hasn't been paid yet, you can cancel it instead from My orders (Order Cancellation and Changes › When you can cancel).",
+      "answer": "Not yet: order 102 is still Awaiting validation, and an order can only be returned once it has shipped (Returns Policy › How to start a return). It's already being processed, so it can no longer be cancelled either; once the helmet arrives you'll have 60 days to return it.",
+      "rubric": [
+        { "item": "Says order 102 can't be returned yet because it hasn't shipped", "passes": true },
+        { "item": "Says order 102 can still be cancelled because it hasn't been paid", "passes": false }
+      ]
+    },
+    {
+      "id": "kayaks-none-found",
+      "category": "catalog",
+      "note": "Correct: the catalog search found nothing, and the answer says so without naming a product.",
+      "turns": ["do you sell kayaks?"],
+      "policySections": [],
+      "reference": "The catalog search found no kayaks, so AdventureWorks doesn't seem to sell them. Offer to help find other gear.",
+      "answer": "I couldn't find any kayaks in the AdventureWorks catalog, so it looks like we don't carry them. I'm happy to help you find other gear for your trip if you tell me what you need.",
+      "rubric": [
+        { "item": "Says the store has no kayaks, or that the search found none", "passes": true },
+        { "item": "Names no product that the catalog search didn't return", "passes": true }
+      ]
+    },
+    {
+      "id": "kayaks-invented-product",
+      "category": "catalog",
+      "note": "Wrong: the catalog search found nothing, but the answer invents a kayak with a brand and a price.",
+      "turns": ["do you sell kayaks?"],
+      "policySections": [],
+      "reference": "The catalog search found no kayaks, so AdventureWorks doesn't seem to sell them. Offer to help find other gear.",
+      "answer": "Yes! We carry the **RiverRunner 300 Kayak** by Quester for $499.99, a stable sit-on-top kayak that's great for lakes and slow rivers. Would you like me to add it to your cart?",
+      "rubric": [
+        { "item": "Says the store has no kayaks, or that the search found none", "passes": false },
+        { "item": "Names no product that the catalog search didn't return", "passes": false }
+      ]
+    },
+    {
+      "id": "weather-declined",
+      "category": "out-of-scope",
+      "note": "Correct: declines the off-topic question politely and offers AdventureWorks help.",
+      "turns": ["what's the weather going to be in Seattle tomorrow?"],
+      "policySections": [],
+      "reference": "I can't help with weather forecasts. I'm the AdventureWorks Shopping Assistant, so I can help with products, your orders, and store policies such as returns and shipping.",
+      "answer": "Sorry, I can't check the weather. I'm the AdventureWorks Shopping Assistant, so I can help you find gear, check on your orders, or answer questions about returns and shipping. Is there anything like that I can do for you?",
+      "rubric": [
+        { "item": "Declines politely and offers AdventureWorks help", "passes": true },
+        { "item": "Gives no weather forecast", "passes": true }
+      ]
+    },
+    {
+      "id": "weather-answered",
+      "category": "out-of-scope",
+      "note": "Wrong: answers the off-topic question with an invented forecast instead of declining, then upsells.",
+      "turns": ["what's the weather going to be in Seattle tomorrow?"],
+      "policySections": [],
+      "reference": "I can't help with weather forecasts. I'm the AdventureWorks Shopping Assistant, so I can help with products, your orders, and store policies such as returns and shipping.",
+      "answer": "Tomorrow in Seattle expect light rain and a high of about 12°C (54°F). Good weather for the Frostbite Insulated Jacket! Can I help you find one?",
+      "rubric": [
+        { "item": "Declines politely and offers AdventureWorks help", "passes": false },
+        { "item": "Gives no weather forecast", "passes": false }
+      ]
+    }
+  ]
+}

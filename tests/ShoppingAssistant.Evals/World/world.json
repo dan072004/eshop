@@ -1,0 +1,51 @@
+{
+  "$comment": "The fixed world every eval case is written against. Cases refer to orders by number. Buyers' claims are Identity's seed (UsersSeed, ProfileService claim types); products are Catalog's seed (catalog.json).",
+  "now": "2026-11-01T12:00:00Z",
+  "buyers": [
+    {
+      "userName": "alice",
+      "claims": {
+        "name": "Alice",
+        "last_name": "Smith",
+        "address_street": "15703 NE 61st Ct",
+        "address_city": "Redmond",
+        "address_state": "WA",
+        "address_zip_code": "98052",
+        "address_country": "U.S.",
+        "email": "AliceSmith@email.com",
+        "phone_number": "1234567890"
+      }
+    },
+    {
+      "userName": "bob",
+      "claims": {
+        "name": "Bob",
+        "last_name": "Smith",
+        "address_street": "15703 NE 61st Ct",
+        "address_city": "Redmond",
+        "address_state": "WA",
+        "address_zip_code": "98052",
+        "address_country": "U.S.",
+        "email": "BobSmith@email.com",
+        "phone_number": "1234567890"
+      }
+    }
+  ],
+  "orders": [
+    { "orderNumber": 101, "buyer": "alice", "orderDate": "2026-10-31T09:30:00Z", "status": "Shipped", "items": [ { "productId": 9, "units": 1 }, { "productId": 8, "units": 1 } ] },
+    { "orderNumber": 102, "buyer": "alice", "orderDate": "2026-10-30T09:30:00Z", "status": "AwaitingValidation", "items": [ { "productId": 10, "units": 1 } ] },
+    { "$comment": "Outside its Return Window on 2026-11-01.", "orderNumber": 103, "buyer": "alice", "orderDate": "2026-07-15T09:30:00Z", "status": "Shipped", "items": [ { "productId": 1, "units": 1 } ] },
+    { "orderNumber": 104, "buyer": "alice", "orderDate": "2026-10-25T09:30:00Z", "status": "Cancelled", "items": [ { "productId": 4, "units": 1 } ] },
+    { "orderNumber": 201, "buyer": "bob", "orderDate": "2026-10-28T09:30:00Z", "status": "Paid", "items": [ { "productId": 42, "units": 1 } ] },
+    { "orderNumber": 202, "buyer": "bob", "orderDate": "2026-10-31T09:30:00Z", "status": "Submitted", "items": [ { "productId": 45, "units": 1 } ] }
+  ],
+  "products": [
+    { "id": 1, "name": "Wanderer Black Hiking Boots", "type": "Footwear", "brand": "Daybird", "price": 109.99, "description": "Daybird's Wanderer Hiking Boots in sleek black are perfect for all your outdoor adventures. These boots are made with a waterproof leather upper and a durable rubber sole for superior traction. With their cushioned insole and padded collar, these boots will keep you comfortable all day long." },
+    { "id": 4, "name": "Expedition Backpack", "type": "Bags", "brand": "Quester", "price": 129.99, "description": "The Expedition Backpack by Quester is a must-have for every outdoor enthusiast. With its spacious interior and multiple pockets, you can easily carry all your gear and essentials. Made with durable nylon fabric, this backpack is built to withstand the toughest conditions. The orange accents add a touch of style to this functional backpack." },
+    { "id": 8, "name": "Frostbite Insulated Jacket", "type": "Jackets", "brand": "Grolltex", "price": 179.99, "description": "Stay warm and stylish with the Frostbite Insulated Jacket by Grolltex. Featuring a water-resistant outer shell and lightweight insulation, this jacket is perfect for cold weather adventures. The black and gray color combination and Grolltex logo add a touch of sophistication. With its adjustable hood and multiple pockets, this jacket offers both style and functionality." },
+    { "id": 9, "name": "VenturePro GPS Watch", "type": "Navigation", "brand": "AirStrider", "price": 199.99, "description": "Navigate with confidence using the VenturePro GPS Watch by AirStrider. This rugged and durable watch features a built-in GPS, altimeter, and compass, allowing you to track your progress and find your way in any terrain. With its sleek black design and easy-to-read display, this watch is both stylish and practical. The VenturePro GPS Watch is a must-have for every adventurer." },
+    { "id": 10, "name": "Trailblazer Bike Helmet", "type": "Cycling", "brand": "Green Equipment", "price": 59.99, "description": "Stay safe on your cycling adventures with the Trailblazer Bike Helmet by Green Equipment. This lightweight and durable helmet features an adjustable fit system and ventilation for added comfort. With its vibrant green color and sleek design, you'll stand out on the road. The Trailblazer Bike Helmet is perfect for all types of cycling, from mountain biking to road cycling." },
+    { "id": 42, "name": "Gravity 5000 All-Mountain Skis", "type": "Ski/boarding", "brand": "Gravitator", "price": 699.00, "description": "Take on any slope confidently with the Gravity 5000 All-Mountain Skis by Gravitator. These skis feature a versatile design that excels in all conditions, from powder to hardpack. They are equipped with a lightweight wood core, carbon inserts for responsiveness, and ABS sidewalls for added durability. These skis come in a striking blue color." },
+    { "id": 45, "name": "Elemental 3-Season Tent", "type": "Trekking", "brand": "Solstix", "price": 189.99, "description": "Experience the great outdoors with the Elemental 3-Season Tent by Solstix. This lightweight and compact tent is perfect for backpacking adventures. It offers ample space for two people and features a durable waterproof fabric, sturdy aluminum poles, and ventilation panels for optimal airflow. The vibrant green color adds a touch of visibility to your camping setup." }
+  ]
+}

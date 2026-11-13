@@ -21,6 +21,12 @@ dotnet test --project tests/Ordering.UnitTests --filter "FullyQualifiedName~Canc
 
 npm ci && npx playwright install chromium
 npm run test:e2e                             # Playwright journeys in e2e/; starts the AppHost itself
+
+# Shopping Assistant evals: opt-in, call a real Claude model, about $1 per fresh run (ADR 0006)
+dotnet user-secrets set ANTHROPIC_API_KEY "<key>" --project tests/ShoppingAssistant.Evals   # or the ANTHROPIC_API_KEY env var
+ESHOP_EVALS=1 dotnet test --project tests/ShoppingAssistant.Evals                          # all 40 cases and the gate
+ESHOP_EVALS=1 ESHOP_EVALS_CASE=returns-gps-watch-last-order dotnet test --project tests/ShoppingAssistant.Evals  # some cases, no gate
+dotnet aieval report -p artifacts/evals-store --open                                       # the HTML report
 ```
 
 - Tests run on **Microsoft.Testing.Platform** (`global.json` `"test.runner"`), so use `--project` / `--solution`. VSTest-only flags such as `-nologo` fail.
@@ -29,6 +35,7 @@ npm run test:e2e                             # Playwright journeys in e2e/; star
 - Build output goes to `artifacts/` (`UseArtifactsOutput`). While the app runs, its DLLs are locked; to build or test without stopping it, add `--artifacts-path <some other dir>`.
 - Playwright CI sets `ESHOP_USE_HTTP_ENDPOINTS=1`, which makes the AppHost use plain-HTTP launch profiles, and logs in with `USERNAME1`/`PASSWORD` (seeded users such as `alice` / `bob`, password `Pass123$`).
 - Package versions are centralised in `Directory.Packages.props`; don't put versions in individual csproj files.
+- Without `ESHOP_EVALS=1`, the evals' model-calling tests are skipped and only the eval project's fast tests run, so a normal `dotnet test` needs no key. Cached answers are replayed for 14 days; `ESHOP_EVALS_FRESH=1` samples every case again. CI runs the evals in `.github/workflows/evals.yml` on PRs that touch the assistant, with the key from the `evals` environment.
 
 ## Architecture
 
@@ -71,6 +78,7 @@ Test behaviour through a public **seam** (an HTTP endpoint, a repository interfa
 | Above infrastructure that only stores or transports data | Fast test with an in-memory **fake** at that seam |
 | In a system we don't own (RabbitMQ `IEventBus`, outbound HTTP, clock, framework types) | Fake or NSubstitute at that boundary only |
 | Nowhere near infrastructure (domain aggregates) | Plain fast test |
+| In the model's reaction to our system prompt, tool descriptions and tool results (the Shopping Assistant's answers) | An eval case in `tests/ShoppingAssistant.Evals`, run with a real model (opt-in, ADR 0006). The eval's own checks and gate get plain fast tests |
 
 - NSubstitute is for boundaries we don't own. Our own types (`IMediator`, handlers, query and repository interfaces) are used for real, or replaced by a fake. Assert on outcomes read back through the seam; `Received(...)` belongs only on a boundary such as `IEventBus`.
 - A fake is a small working implementation (e.g. a `Dictionary`-backed repository) that is allowed only when the real adapter just persists. Every fake runs the same contract tests as its real adapter, so it can't drift. A fake may only give answers the real adapter can give. A canned-answer stub for a query port needs no contract test; a fake that implements logic does.

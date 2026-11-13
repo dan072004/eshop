@@ -1,0 +1,150 @@
+# DRAFT from the evals grilling (2026-11-09); see decisions.md. Superseded by .github/workflows/evals.yml (ticket 09); the comment and badge jobs are ticket 10.
+# .github/workflows/evals.yml
+name: Shopping Assistant evals
+
+on:
+  pull_request:              # no paths: here, so the required check always reports (Q16)
+  push:
+    branches: [main]         # main runs seed the cache (Q19) and update the badge (Q18)
+  workflow_dispatch:
+    inputs:
+      fresh:
+        description: Ignore cached responses and sample every case again
+        type: boolean
+        default: false
+
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read        # for the paths filter
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: evals       # holds ANTHROPIC_API_KEY: a CI-only key with a spend limit (Q11)
+    outputs:
+      ran: ${{ steps.decide.outputs.ran }}
+    env:
+      HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}   # false on fork and Dependabot PRs
+      EVALS_STORE: ${{ github.workspace }}/artifacts/evals-store
+      DOTNET_AIEVAL_TELEMETRY_OPTOUT: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            assistant:
+              - 'src/WebApp/Components/Chatbot/**'
+              - 'src/WebApp/Extensions/**'
+              - 'src/eShop.Assistant.Tools/**'
+              - 'src/Policy.API/**'
+              - 'policies/**'
+              - 'tests/ShoppingAssistant.Evals/**'
+              - '.github/workflows/evals.yml'
+
+      - name: Decide whether to run
+        id: decide
+        run: |
+          mkdir -p "$EVALS_STORE"
+          if [ "$HAS_KEY" != "true" ]; then
+            echo "ran=false" >> "$GITHUB_OUTPUT"
+            echo "Evals not run: no API key on this PR (fork or Dependabot)." > "$EVALS_STORE/summary.md"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ steps.changes.outputs.assistant }}" = "true" ]; then
+            echo "ran=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ran=false" >> "$GITHUB_OUTPUT"
+            echo "Evals not run: no assistant changes." > "$EVALS_STORE/summary.md"
+          fi
+
+      - uses: actions/setup-dotnet@v4
+        if: steps.decide.outputs.ran == 'true'
+
+      - name: Restore cached responses
+        if: steps.decide.outputs.ran == 'true' && !inputs.fresh
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.EVALS_STORE }}
+          key: evals-${{ github.run_id }}
+          restore-keys: evals-
+
+      - name: Build
+        if: steps.decide.outputs.ran == 'true'
+        run: dotnet build tests/ShoppingAssistant.Evals
+
+      - name: Run evals            # exits non-zero when the gate fails (Q16)
+        if: steps.decide.outputs.ran == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}   # this step only (Q11)
+          ESHOP_EVALS: 1
+          ESHOP_EVALS_FRESH: ${{ inputs.fresh && '1' || '' }}
+        run: dotnet test --project tests/ShoppingAssistant.Evals --no-build
+        # the project writes summary.md and evals.json into $EVALS_STORE
+
+      - name: HTML report and cache cleanup
+        if: always() && steps.decide.outputs.ran == 'true'
+        run: |
+          dotnet tool restore
+          dotnet aieval report -p "$EVALS_STORE" -o "$EVALS_STORE/report.html"
+          dotnet aieval clean-cache -p "$EVALS_STORE"
+
+      - name: Save cached responses
+        if: always() && steps.decide.outputs.ran == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.EVALS_STORE }}
+          key: evals-${{ github.run_id }}
+
+      - name: Job summary
+        if: always()
+        run: cat "$EVALS_STORE/summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evals
+          path: |
+            ${{ env.EVALS_STORE }}/summary.md
+            ${{ env.EVALS_STORE }}/evals.json
+            ${{ env.EVALS_STORE }}/report.html
+
+  comment:                   # sticky PR comment; this job never sees the key (Q17)
+    needs: evals
+    if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: evals }
+      - uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: evals
+          path: summary.md
+
+  badge:                     # README badge from main's latest run (Q18)
+    needs: evals
+    if: always() && github.event_name == 'push' && needs.evals.outputs.ran == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: evals }
+      - uses: actions/checkout@v4
+        with: { ref: badges, path: badges }
+      - run: |
+          cp evals.json badges/evals.json      # shields.io endpoint format
+          cd badges
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Eval score for ${GITHUB_SHA::7}" || exit 0
+          git push
+
+# README badge: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/dan072004/eshop/badges/evals.json
+# evals.json: {"schemaVersion":1,"label":"evals","message":"37/40","color":"green"}
