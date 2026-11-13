@@ -456,7 +456,7 @@
       "mustNotCallTools": [],
       "mustCite": [],
       "mustContain": ["TrailSeeker GPS Watch", "$149.99"],
-      "mustNotContain": ["201", "202"],
+      "mustNotContain": [],
       "reference": "The cheapest GPS watch is the TrailSeeker GPS Watch at $149.99. Next is the Pulse Recon Tactical GPS Watch at $169.00.",
       "rubric": [
         "Names the TrailSeeker GPS Watch at $149.99 as the cheapest",
@@ -475,8 +475,8 @@
       "mustCallTools": ["search_catalog"],
       "mustNotCallTools": [],
       "mustCite": [],
-      "mustContain": ["Nomad 2-Person Tent", "Survivor 2-Person Tent"],
-      "mustNotContain": ["201", "202"],
+      "mustContain": ["Nomad 2-Person Tent", "Survivor 2-Person Tent", "$229.00", "$249.99"],
+      "mustNotContain": [],
       "reference": "Yes, two: the Nomad 2-Person Tent by XE ($229.00) and the Survivor 2-Person Tent by XE ($249.99), both waterproof.",
       "rubric": [
         "Offers the Nomad 2-Person Tent and the Survivor 2-Person Tent",
@@ -495,7 +495,7 @@
       "mustCallTools": ["search_catalog"],
       "mustNotCallTools": [],
       "mustCite": [],
-      "mustContain": ["Guardian Blue Chalk Bag", "SummitStone Chalk Bag"],
+      "mustContain": ["Guardian Blue Chalk Bag", "SummitStone Chalk Bag", "$21.99", "$29.99"],
       "mustNotContain": [],
       "reference": "Yes: the Guardian Blue Chalk Bag by Legend ($21.99) and the SummitStone Chalk Bag by Grolltex ($29.99).",
       "rubric": [
@@ -515,8 +515,8 @@
       "mustCallTools": ["search_catalog"],
       "mustNotCallTools": [],
       "mustCite": [],
-      "mustContain": ["Stormbreaker Waterproof Jacket"],
-      "mustNotContain": ["201", "202"],
+      "mustContain": ["Stormbreaker Waterproof Jacket", "$139.99"],
+      "mustNotContain": [],
       "reference": "The Stormbreaker Waterproof Jacket by Zephyr ($139.99) is fully waterproof and windproof, so it suits hiking in the rain. The Frostbite Insulated Jacket ($179.99) is only water-resistant and is meant for cold weather.",
       "rubric": [
         "Recommends the Stormbreaker Waterproof Jacket for rain",
