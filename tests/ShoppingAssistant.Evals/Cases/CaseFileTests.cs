@@ -77,13 +77,6 @@ public sealed class CaseFileTests
         Assert.Empty(withoutIt);
     }
 
-    private static string TitleOf(string citation) => citation.Split(" › ")[0];
-
-    // The Policy files as policy-api indexes them: the copy of policies/ in the build output.
-    private static List<ParsedPolicy> Policies() =>
-        [.. Directory.EnumerateFiles(Path.Combine(AppContext.BaseDirectory, "policies"), "*.md")
-            .Select(path => PolicySplitter.Split(Path.GetFileName(path), File.ReadAllText(path)))];
-
     [Fact]
     public void ACaseMissingAFieldFailsToLoadSoItCannotSilentlyLoseACheck()
     {
@@ -100,4 +93,11 @@ public sealed class CaseFileTests
 
         Assert.Contains("mustNotContain", error.Message);
     }
+
+    private static string TitleOf(string citation) => citation.Split(" › ")[0];
+
+    // The Policy files as policy-api indexes them: the copy of policies/ in the build output.
+    private static List<ParsedPolicy> Policies() =>
+        [.. Directory.EnumerateFiles(Path.Combine(AppContext.BaseDirectory, "policies"), "*.md")
+            .Select(path => PolicySplitter.Split(Path.GetFileName(path), File.ReadAllText(path)))];
 }

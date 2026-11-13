@@ -1,5 +1,4 @@
 ﻿using System.Text;
-using eShop.Assistant.Tools;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
 using Microsoft.Extensions.AI.Evaluation.Reporting;
@@ -64,37 +63,33 @@ public sealed class RubricEvaluator : IEvaluator
             new ChatOptions { Instructions = Instructions },
             cancellationToken: cancellationToken);
 
-        var verdicts = response.TryGetResult(out var result) ? result.Verdicts : null;
-        var byItem = verdicts?.GroupBy(v => v.Item).ToDictionary(g => g.Key, g => g.First()) ?? [];
-        if (verdicts is null || byItem.Count != evalCase.Rubric.Count || !Enumerable.Range(1, evalCase.Rubric.Count).All(byItem.ContainsKey))
-        {
-            throw new JudgeReplyException(evalCase.Id, evalCase.Rubric.Count, response.Text);
-        }
-
-        var evaluation = new EvaluationResult(evalCase.Rubric.Select((item, i) =>
-        {
-            var verdict = byItem[i + 1];
-            var metric = new BooleanMetric(ItemPrefix + item, verdict.Pass, verdict.Reason)
-            {
-                Interpretation = new EvaluationMetricInterpretation(
-                    verdict.Pass ? EvaluationRating.Good : EvaluationRating.Unacceptable, failed: !verdict.Pass, verdict.Reason),
-            };
-            metric.AddOrUpdateChatMetadata(response);
-            return (EvaluationMetric)metric;
-        }));
-        return evaluation;
+        var byItem = VerdictsByItem(response, evalCase);
+        return new EvaluationResult(evalCase.Rubric.Select((item, i) => RubricMetric(item, byItem[i + 1], response)));
     }
 
     private static string Prompt(EvalCase evalCase, EvalConversation conversation)
     {
         var prompt = new StringBuilder();
+        AppendQuestion(prompt, evalCase.Turns);
+        AppendPolicySections(prompt, conversation);
+        prompt.AppendLine("<reference>").AppendLine(evalCase.Reference).AppendLine("</reference>");
+        prompt.AppendLine("<answer>").AppendLine(conversation.FinalAnswer).AppendLine("</answer>");
+        AppendRubric(prompt, evalCase.Rubric);
+        return prompt.ToString();
+    }
+
+    private static void AppendQuestion(StringBuilder prompt, IReadOnlyList<string> turns)
+    {
         prompt.AppendLine("<question>");
-        foreach (var turn in evalCase.Turns)
+        foreach (var turn in turns)
         {
             prompt.AppendLine(turn);
         }
         prompt.AppendLine("</question>");
+    }
 
+    private static void AppendPolicySections(StringBuilder prompt, EvalConversation conversation)
+    {
         prompt.AppendLine("<policy_sections>");
         var sections = PolicySections(conversation).ToList();
         if (sections.Count == 0)
@@ -106,28 +101,48 @@ public sealed class RubricEvaluator : IEvaluator
             prompt.AppendLine($"<section citation=\"{citation}\">").AppendLine(text).AppendLine("</section>");
         }
         prompt.AppendLine("</policy_sections>");
-
-        prompt.AppendLine("<reference>").AppendLine(evalCase.Reference).AppendLine("</reference>");
-        prompt.AppendLine("<answer>").AppendLine(conversation.FinalAnswer).AppendLine("</answer>");
-
-        prompt.AppendLine("<rubric>");
-        for (var i = 0; i < evalCase.Rubric.Count; i++)
-        {
-            prompt.AppendLine($"{i + 1}. {evalCase.Rubric[i]}");
-        }
-        prompt.AppendLine("</rubric>");
-        return prompt.ToString();
     }
 
     private static IEnumerable<(string Citation, string Text)> PolicySections(EvalConversation conversation) =>
-        conversation.ResultsOf(AssistantToolNames.SearchPolicies)
-            .Where(r => r.ValueKind == JsonValueKind.Object && r.TryGetProperty("results", out var results) && results.ValueKind == JsonValueKind.Array)
-            .SelectMany(r => r.GetProperty("results").EnumerateArray())
-            .Where(s => s.ValueKind == JsonValueKind.Object
-                && s.TryGetProperty("citation", out var c) && c.ValueKind == JsonValueKind.String
+        conversation.PolicySearchResults()
+            .Where(s => s.TryGetProperty("citation", out var c) && c.ValueKind == JsonValueKind.String
                 && s.TryGetProperty("text", out var t) && t.ValueKind == JsonValueKind.String)
             .Select(s => (s.GetProperty("citation").GetString()!, s.GetProperty("text").GetString()!))
             .DistinctBy(s => s.Item1);
+
+    private static void AppendRubric(StringBuilder prompt, IReadOnlyList<string> rubric)
+    {
+        prompt.AppendLine("<rubric>");
+        for (var i = 0; i < rubric.Count; i++)
+        {
+            prompt.AppendLine($"{i + 1}. {rubric[i]}");
+        }
+        prompt.AppendLine("</rubric>");
+    }
+
+    /// <exception cref="JudgeReplyException">The reply is not one verdict for each rubric item, numbered from 1.</exception>
+    private static Dictionary<int, JudgeVerdict> VerdictsByItem(ChatResponse<JudgeVerdicts> response, EvalCase evalCase)
+    {
+        var verdicts = response.TryGetResult(out var result) ? result.Verdicts : null;
+        var byItem = verdicts?.GroupBy(v => v.Item).ToDictionary(g => g.Key, g => g.First()) ?? [];
+        if (verdicts is null || byItem.Count != evalCase.Rubric.Count || !Enumerable.Range(1, evalCase.Rubric.Count).All(byItem.ContainsKey))
+        {
+            throw new JudgeReplyException(evalCase.Id, evalCase.Rubric.Count, response.Text);
+        }
+
+        return byItem;
+    }
+
+    private static EvaluationMetric RubricMetric(string item, JudgeVerdict verdict, ChatResponse response)
+    {
+        var metric = new BooleanMetric(ItemPrefix + item, verdict.Pass, verdict.Reason)
+        {
+            Interpretation = new EvaluationMetricInterpretation(
+                verdict.Pass ? EvaluationRating.Good : EvaluationRating.Unacceptable, failed: !verdict.Pass, verdict.Reason),
+        };
+        metric.AddOrUpdateChatMetadata(response);
+        return metric;
+    }
 
     /// <summary>The judge's structured output.</summary>
     public sealed record JudgeVerdicts(IReadOnlyList<JudgeVerdict> Verdicts);

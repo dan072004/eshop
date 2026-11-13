@@ -17,16 +17,6 @@ public sealed class CachingKeysTests
 
     private const string WorldFile = """{ "now": "2026-11-01T12:00:00Z", "buyers": [] }""";
 
-    private static IReadOnlyList<AITool> Tools(string searchPoliciesDescription = "Searches the AdventureWorks Policies.") =>
-    [
-        AIFunctionFactory.Create((string query) => query, "search_policies", searchPoliciesDescription),
-        AIFunctionFactory.Create(() => "[]", "list_my_orders", "Lists the signed-in Buyer's orders, newest first."),
-    ];
-
-    private static IReadOnlyList<string> Keys(
-        IReadOnlyList<AITool>? tools = null, string caseFile = CaseFile, string caseId = "returns-gps-watch-last-order", string worldFile = WorldFile) =>
-        CachingKeys.ForCase(tools ?? Tools(), caseFile, caseId, worldFile);
-
     [Fact]
     public void TheSameToolsCaseAndWorldGiveTheSameKeys()
     {
@@ -81,12 +71,12 @@ public sealed class CachingKeysTests
     [Fact]
     public void ACrlfCheckoutGivesTheSameKeysAsAnLfOne()
     {
-        const string caseFile = "{ \"cases\": [\n  {\n    \"id\": \"returns-gps-watch-last-order\",\n    \"turns\": [\"what's the return window for my last order?\"]\n  }\n] }\n";
-        const string worldFile = "{\n  \"now\": \"2026-11-01T12:00:00Z\",\n  \"buyers\": []\n}\n";
+        const string MultiLineCaseFile = "{ \"cases\": [\n  {\n    \"id\": \"returns-gps-watch-last-order\",\n    \"turns\": [\"what's the return window for my last order?\"]\n  }\n] }\n";
+        const string MultiLineWorldFile = "{\n  \"now\": \"2026-11-01T12:00:00Z\",\n  \"buyers\": []\n}\n";
 
         Assert.Equal(
-            Keys(caseFile: caseFile, worldFile: worldFile),
-            Keys(caseFile: caseFile.ReplaceLineEndings("\r\n"), worldFile: worldFile.ReplaceLineEndings("\r\n")));
+            Keys(caseFile: MultiLineCaseFile, worldFile: MultiLineWorldFile),
+            Keys(caseFile: MultiLineCaseFile.ReplaceLineEndings("\r\n"), worldFile: MultiLineWorldFile.ReplaceLineEndings("\r\n")));
     }
 
     [Fact]
@@ -96,4 +86,14 @@ public sealed class CachingKeysTests
 
         Assert.NotEqual(Keys(), Keys(worldFile: edited));
     }
+
+    private static IReadOnlyList<AITool> Tools(string searchPoliciesDescription = "Searches the AdventureWorks Policies.") =>
+    [
+        AIFunctionFactory.Create((string query) => query, "search_policies", searchPoliciesDescription),
+        AIFunctionFactory.Create(() => "[]", "list_my_orders", "Lists the signed-in Buyer's orders, newest first."),
+    ];
+
+    private static IReadOnlyList<string> Keys(
+        IReadOnlyList<AITool>? tools = null, string caseFile = CaseFile, string caseId = "returns-gps-watch-last-order", string worldFile = WorldFile) =>
+        CachingKeys.ForCase(tools ?? Tools(), caseFile, caseId, worldFile);
 }

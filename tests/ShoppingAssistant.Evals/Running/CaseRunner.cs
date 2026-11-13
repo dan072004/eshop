@@ -23,30 +23,49 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, Cach
         EvalCase evalCase, string iterationName = Defaults.DefaultIterationName, CancellationToken cancellationToken = default)
     {
         var errors = new ModelErrors();
+        await using var provider = Services(evalCase, errors).BuildServiceProvider();
+        var basket = new OutOfScopeBasket();
+        ChatState Conversation(IChatClient chatClient) => new(
+            basket,
+            basket,
+            Principal(evalCase),
+            provider.GetRequiredService<eShop.Assistant.Tools.AssistantTools>(),
+            provider.GetRequiredService<ILoggerFactory>(),
+            chatClient);
+
+        var cachingKeys = await CachingKeysAsync(evalCase, Conversation, cancellationToken);
+        var sample = await model.OpenAsync(evalCase.Id, iterationName, cachingKeys, cancellationToken);
+        var chat = Conversation(ClaudeChatPipeline.Build(sample.ChatClient, configuration, provider));
+        await SendTurnsAsync(chat, evalCase, errors);
+
+        return new CaseTranscript(chat.Messages.ToList()) { CachingKeys = cachingKeys, ModelCalls = sample.ModelCalls, Usage = sample.Usage };
+    }
+
+    // The tools library over the real policy-api and the world's stubs, logging model errors to errors.
+    private IServiceCollection Services(EvalCase evalCase, ModelErrors errors)
+    {
         var services = new ServiceCollection().AddLogging(logging => logging.AddProvider(errors));
         var tools = services.AddEvalWorld(world, evalCase.SignedInAs, evalCase.CatalogResults);
         tools.PolicyClient
             .ConfigureHttpClient(client => client.BaseAddress = policyApi.Server.BaseAddress)
             .ConfigurePrimaryHttpMessageHandler(() => policyApi.Server.CreateHandler());
+        return services;
+    }
 
-        await using var provider = services.BuildServiceProvider();
-        var basket = new OutOfScopeBasket();
-        ChatState Conversation(IChatClient chatClient) => new(
-            basket,
-            basket,
-            evalCase.SignedInAs is { } userName ? world.Buyer(userName).ToPrincipal() : new ClaimsPrincipal(new ClaimsIdentity()),
-            provider.GetRequiredService<eShop.Assistant.Tools.AssistantTools>(),
-            provider.GetRequiredService<ILoggerFactory>(),
-            chatClient);
+    private ClaimsPrincipal Principal(EvalCase evalCase) =>
+        evalCase.SignedInAs is { } userName ? world.Buyer(userName).ToPrincipal() : new ClaimsPrincipal(new ClaimsIdentity());
 
-        var cachingKeys = CachingKeys.ForCase(
-            await ToolsProbe.ToolsOfAsync(Conversation),
+    private static async Task<IReadOnlyList<string>> CachingKeysAsync(
+        EvalCase evalCase, Func<IChatClient, ChatState> conversation, CancellationToken cancellationToken) =>
+        CachingKeys.ForCase(
+            await ToolsProbe.ToolsOfAsync(conversation),
             await File.ReadAllTextAsync(EvalCase.FilePath, cancellationToken),
             evalCase.Id,
             await File.ReadAllTextAsync(EvalWorld.FilePath, cancellationToken));
-        var sample = await model.OpenAsync(evalCase.Id, iterationName, cachingKeys, cancellationToken);
-        var chat = Conversation(ClaudeChatPipeline.Build(sample.ChatClient, configuration, provider));
 
+    /// <exception cref="ModelCallFailedException">A model call failed.</exception>
+    private static async Task SendTurnsAsync(ChatState chat, EvalCase evalCase, ModelErrors errors)
+    {
         foreach (var turn in evalCase.Turns)
         {
             await chat.AddUserMessageAsync(turn, () => { });
@@ -57,8 +76,6 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, Cach
                 throw new ModelCallFailedException(evalCase.Id, error);
             }
         }
-
-        return new CaseTranscript(chat.Messages.ToList()) { CachingKeys = cachingKeys, ModelCalls = sample.ModelCalls, Usage = sample.Usage };
     }
 
     // The tools the conversation class sends, read off its first request; it asks no model.
@@ -90,6 +107,9 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, Cach
     // Records the exception the conversation class logs when a model call fails.
     private sealed class ModelErrors : ILoggerProvider
     {
+        // What the conversation class logs when a model call fails.
+        private const string ChatError = "Error getting chat completions.";
+
         public Exception? First { get; private set; }
 
         public ILogger CreateLogger(string categoryName) =>
@@ -105,7 +125,7 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, Cach
 
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
             {
-                if (logLevel >= LogLevel.Error && exception is not null && formatter(state, exception) == "Error getting chat completions.")
+                if (logLevel >= LogLevel.Error && exception is not null && formatter(state, exception) == ChatError)
                 {
                     errors.First ??= exception;
                 }

@@ -1,4 +1,6 @@
 ﻿using Anthropic;
+using Microsoft.Extensions.AI.Evaluation;
+using Microsoft.Extensions.AI.Evaluation.Reporting;
 using ShoppingAssistant.Evals.Checks;
 using ShoppingAssistant.Evals.Gate;
 using ShoppingAssistant.Evals.Running;
@@ -30,36 +32,51 @@ public static class CalibrationRun
         List<TokenUsage> usage = [];
         foreach (var answer in JudgeCalibration.LoadAll())
         {
-            var scenarioName = JudgeCalibration.ScenarioPrefix + answer.Id;
-            string executionName, iterationName;
-            JudgeFailedException? failed = null;
-            await using (var scenario = await reporting.CreateScenarioRunAsync(scenarioName, cancellationToken: cancellationToken))
+            var graded = await GradeAsync(reporting, answer, cancellationToken);
+            judgeErrors.AddRange(graded.JudgeErrors);
+            usage.AddRange(graded.Usage);
+            if (graded.InfrastructureError is not null)
             {
-                (executionName, iterationName) = (scenario.ExecutionName, scenario.IterationName);
-                var result = await scenario.EvaluateAsync(
-                    answer.Prompt, answer.Reply, [new EvalCaseContext(answer.Case)], cancellationToken);
-
-                // Compare re-interprets the rubric metrics before the scenario is stored, so the report shows judge errors.
-                try
-                {
-                    judgeErrors.AddRange(JudgeCalibration.Compare(answer, result));
-                }
-                catch (JudgeFailedException e)
-                {
-                    failed = e;
-                }
-            }
-
-            // The stored scenario records each judge call and whether the cache answered it; only misses cost tokens.
-            var stored = await reporting.ResultStore.ReadResultsAsync(executionName, scenarioName, iterationName, cancellationToken)
-                .SingleAsync(cancellationToken);
-            usage.AddRange(JudgeUsage.Tokens(stored));
-            if (failed is not null)
-            {
-                return new CalibrationOutcome(judgeErrors, usage, failed.Message);
+                return new CalibrationOutcome(judgeErrors, usage, graded.InfrastructureError);
             }
         }
 
         return new CalibrationOutcome(judgeErrors, usage);
+    }
+
+    // One answer's outcome: its judge errors, or why it has none, and the tokens of its judge call.
+    private static async Task<CalibrationOutcome> GradeAsync(
+        ReportingConfiguration reporting, CalibrationAnswer answer, CancellationToken cancellationToken)
+    {
+        var scenarioName = JudgeCalibration.ScenarioPrefix + answer.Id;
+        var (compared, executionName, iterationName) = await EvaluateAsync(reporting, scenarioName, answer, cancellationToken);
+
+        // The stored scenario records each judge call and whether the cache answered it; only misses cost tokens.
+        var stored = await reporting.ResultStore.ReadResultsAsync(executionName, scenarioName, iterationName, cancellationToken)
+            .SingleAsync(cancellationToken);
+        return compared with { Usage = JudgeUsage.Tokens(stored) };
+    }
+
+    // The scenario is stored when it is disposed, as this method returns.
+    private static async Task<(CalibrationOutcome Compared, string ExecutionName, string IterationName)> EvaluateAsync(
+        ReportingConfiguration reporting, string scenarioName, CalibrationAnswer answer, CancellationToken cancellationToken)
+    {
+        await using var scenario = await reporting.CreateScenarioRunAsync(scenarioName, cancellationToken: cancellationToken);
+        var result = await scenario.EvaluateAsync(answer.Prompt, answer.Reply, [new EvalCaseContext(answer.Case)], cancellationToken);
+
+        // Compare re-interprets the rubric metrics before the scenario is stored, so the report shows judge errors.
+        return (Compare(answer, result), scenario.ExecutionName, scenario.IterationName);
+    }
+
+    private static CalibrationOutcome Compare(CalibrationAnswer answer, EvaluationResult result)
+    {
+        try
+        {
+            return new CalibrationOutcome(JudgeCalibration.Compare(answer, result), Usage: []);
+        }
+        catch (JudgeFailedException e)
+        {
+            return new CalibrationOutcome(JudgeErrors: [], Usage: [], e.Message);
+        }
     }
 }

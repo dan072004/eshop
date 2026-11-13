@@ -1,5 +1,4 @@
-﻿using eShop.Assistant.Tools;
-using Microsoft.Extensions.AI.Evaluation;
+﻿using Microsoft.Extensions.AI.Evaluation;
 using ShoppingAssistant.Evals.Cases;
 
 namespace ShoppingAssistant.Evals.Checks;
@@ -24,13 +23,25 @@ public sealed class CitationsGroundedEvaluator : DeterministicCheck
 
     protected override EvaluationMetric Check(EvalConversation conversation, EvalCase evalCase)
     {
-        var returned = conversation.ResultsOf(AssistantToolNames.SearchPolicies)
-            .SelectMany(Citations)
-            .Where(c => c.Contains(Separator))
-            .Distinct()
-            .ToList();
+        var (grounded, ungrounded) = SortCitations(conversation.FinalAnswer, ReturnedCitations(conversation));
+        if (ungrounded.Count > 0)
+        {
+            return Verdict(false, $"Not returned by search_policies in this run: {Quoted(ungrounded)}.");
+        }
 
-        var answer = conversation.FinalAnswer;
+        return Verdict(true, grounded.Count == 0 ? "No Citation in the answer." : $"Every Citation came from search_policies: {Quoted(grounded)}.");
+    }
+
+    private static List<string> ReturnedCitations(EvalConversation conversation) =>
+        [.. conversation.PolicySearchResults()
+            .Where(r => r.TryGetProperty("citation", out var c) && c.ValueKind == JsonValueKind.String)
+            .Select(r => r.GetProperty("citation").GetString()!)
+            .Where(c => c.Contains(Separator))
+            .Distinct()];
+
+    // Each separator in the answer marks one Citation: the returned one around it, or else the fragment that is there.
+    private static (List<string> Grounded, List<string> Ungrounded) SortCitations(string answer, List<string> returned)
+    {
         List<string> grounded = [];
         List<string> ungrounded = [];
         for (var at = answer.IndexOf(Separator); at >= 0; at = answer.IndexOf(Separator, at + 1))
@@ -39,12 +50,7 @@ public sealed class CitationsGroundedEvaluator : DeterministicCheck
             (match is null ? ungrounded : grounded).Add(match ?? Fragment(answer, at));
         }
 
-        if (ungrounded.Count > 0)
-        {
-            return Verdict(false, $"Not returned by search_policies in this run: {Quoted(ungrounded)}.");
-        }
-
-        return Verdict(true, grounded.Count == 0 ? "No Citation in the answer." : $"Every Citation came from search_policies: {Quoted(grounded)}.");
+        return (grounded, ungrounded);
     }
 
     private static bool SitsAround(string answer, int separatorAt, string citation)
@@ -60,13 +66,4 @@ public sealed class CitationsGroundedEvaluator : DeterministicCheck
         var end = answer.IndexOfAny(Delimiters, separatorAt);
         return answer[start..(end < 0 ? answer.Length : end)].Trim();
     }
-
-    private static IEnumerable<string> Citations(JsonElement result) =>
-        result.ValueKind == JsonValueKind.Object
-            && result.TryGetProperty("results", out var results)
-            && results.ValueKind == JsonValueKind.Array
-            ? results.EnumerateArray()
-                .Where(r => r.ValueKind == JsonValueKind.Object && r.TryGetProperty("citation", out var c) && c.ValueKind == JsonValueKind.String)
-                .Select(r => r.GetProperty("citation").GetString()!)
-            : [];
 }

@@ -1,5 +1,4 @@
-﻿using System.Text.Json.Serialization;
-using eShop.Assistant.Tools;
+﻿using eShop.Assistant.Tools;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
 using ShoppingAssistant.Evals.Cases;
@@ -18,17 +17,10 @@ public static class JudgeCalibration
     /// <summary>Calibration scenarios are named with this prefix, so the report and the gate keep them apart from cases.</summary>
     public const string ScenarioPrefix = "judge-calibration.";
 
-    private static readonly JsonSerializerOptions Options = new(JsonSerializerOptions.Web)
-    {
-        RespectNullableAnnotations = true,
-        RespectRequiredConstructorParameters = true,
-        Converters = { new JsonStringEnumConverter<CaseCategory>(JsonNamingPolicy.KebabCaseLower, allowIntegerValues: false) },
-    };
-
     public static string FilePath => Path.Combine(AppContext.BaseDirectory, "Judge", "calibration.json");
 
     public static IReadOnlyList<CalibrationAnswer> LoadAll() =>
-        JsonSerializer.Deserialize<CalibrationFile>(File.ReadAllText(FilePath), Options)?.Answers
+        JsonSerializer.Deserialize<CalibrationFile>(File.ReadAllText(FilePath), EvalCase.JsonOptions)?.Answers
             ?? throw new InvalidDataException("The calibration file is empty.");
 
     /// <summary>
@@ -46,14 +38,8 @@ public static class JudgeCalibration
         {
             var metric = (BooleanMetric)judged.Metrics[RubricEvaluator.ItemPrefix + item.Item];
             var verdict = metric.Value ?? throw new JudgeFailedException(answer.Id, $"no verdict for \"{item.Item}\"");
-            var asLabelled = verdict == item.Passes;
-            var reason = asLabelled
-                ? $"As labelled ({PassOrFail(item.Passes)}): {metric.Reason}"
-                : $"Judge error: labelled {PassOrFail(item.Passes)}, judged {PassOrFail(verdict)}: {metric.Reason}";
-            metric.Interpretation = new EvaluationMetricInterpretation(
-                asLabelled ? EvaluationRating.Good : EvaluationRating.Unacceptable, failed: !asLabelled, reason);
-
-            if (!asLabelled)
+            InterpretAgainstLabel(metric, item.Passes, verdict);
+            if (verdict != item.Passes)
             {
                 errors.Add(new JudgeError(answer.Id, item.Item, item.Passes, verdict, metric.Reason ?? ""));
             }
@@ -62,7 +48,17 @@ public static class JudgeCalibration
         return errors;
     }
 
-    private static string PassOrFail(bool passes) => passes ? "pass" : "fail";
+    private static void InterpretAgainstLabel(BooleanMetric metric, bool labelled, bool verdict)
+    {
+        var asLabelled = verdict == labelled;
+        var reason = asLabelled
+            ? $"As labelled ({PassOrFail(labelled)}): {metric.Reason}"
+            : $"Judge error: labelled {PassOrFail(labelled)}, judged {PassOrFail(verdict)}: {metric.Reason}";
+        metric.Interpretation = new EvaluationMetricInterpretation(
+            asLabelled ? EvaluationRating.Good : EvaluationRating.Unacceptable, failed: !asLabelled, reason);
+    }
+
+    internal static string PassOrFail(bool passes) => passes ? "pass" : "fail";
 
     private sealed record CalibrationFile(IReadOnlyList<CalibrationAnswer> Answers);
 }
@@ -128,5 +124,5 @@ public sealed record LabelledRubricItem(string Item, bool Passes);
 public sealed record JudgeError(string CalibrationId, string RubricItem, bool Labelled, bool Judged, string JudgeReason)
 {
     public override string ToString() =>
-        $"{CalibrationId}: \"{RubricItem}\" is labelled {(Labelled ? "pass" : "fail")} but the judge said {(Judged ? "pass" : "fail")}: {JudgeReason}";
+        $"{CalibrationId}: \"{RubricItem}\" is labelled {JudgeCalibration.PassOrFail(Labelled)} but the judge said {JudgeCalibration.PassOrFail(Judged)}: {JudgeReason}";
 }

@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.AI;
+﻿using eShop.Assistant.Tools;
+using Microsoft.Extensions.AI;
 
 namespace ShoppingAssistant.Evals.Checks;
 
@@ -42,6 +43,13 @@ public sealed class EvalConversation
                 var other => JsonSerializer.SerializeToElement(other),
             });
     }
+
+    /// <summary>Every Policy Section object in the <c>results</c> of each <c>search_policies</c> call.</summary>
+    public IEnumerable<JsonElement> PolicySearchResults() =>
+        ResultsOf(AssistantToolNames.SearchPolicies)
+            .Where(r => r.ValueKind == JsonValueKind.Object && r.TryGetProperty("results", out var results) && results.ValueKind == JsonValueKind.Array)
+            .SelectMany(r => r.GetProperty("results").EnumerateArray())
+            .Where(s => s.ValueKind == JsonValueKind.Object);
 
     // A tool that failed returns plain text such as "Unable to…", which holds no JSON values.
     private static JsonElement TryParse(string text)

@@ -11,11 +11,12 @@ namespace ShoppingAssistant.Evals.World;
 /// <remarks>A canned-answer stub at a boundary, so it has no contract test.</remarks>
 public sealed class OrderingStub(EvalWorld world) : HttpMessageHandler
 {
+    private const string OrdersPath = "/api/orders";
+    private const string OrderPathPrefix = OrdersPath + "/";
+
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        var buyer = request.Headers.Authorization is { Scheme: "Bearer", Parameter: { } token }
-            ? world.Buyers.SingleOrDefault(b => b.UserName == token)
-            : null;
+        var buyer = SignedInBuyer(request);
         if (buyer is null)
         {
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized));
@@ -26,13 +27,18 @@ public sealed class OrderingStub(EvalWorld world) : HttpMessageHandler
 
         return Task.FromResult(path switch
         {
-            "/api/orders" => Ok(orders.Select(o => new { o.OrderNumber, Date = o.OrderDate, o.Status, Total = Total(o) })),
-            _ when path.StartsWith("/api/orders/", StringComparison.Ordinal)
-                && int.TryParse(path["/api/orders/".Length..], out var number)
+            OrdersPath => Ok(orders.Select(o => new { o.OrderNumber, Date = o.OrderDate, o.Status, Total = Total(o) })),
+            _ when path.StartsWith(OrderPathPrefix, StringComparison.Ordinal)
+                && int.TryParse(path[OrderPathPrefix.Length..], out var number)
                 && orders.SingleOrDefault(o => o.OrderNumber == number) is { } order => Ok(Details(order, buyer)),
             _ => new HttpResponseMessage(HttpStatusCode.NotFound),
         });
     }
+
+    private WorldBuyer? SignedInBuyer(HttpRequestMessage request) =>
+        request.Headers.Authorization is { Scheme: "Bearer", Parameter: { } token }
+            ? world.Buyers.SingleOrDefault(b => b.UserName == token)
+            : null;
 
     private object Details(WorldOrder order, WorldBuyer buyer) => new
     {

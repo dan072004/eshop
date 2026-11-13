@@ -21,12 +21,7 @@ public static class RunGate
     private static (GateVerdict, IReadOnlyList<string>) Verdict(
         IReadOnlyList<CaseResult> cases, IReadOnlyList<SampleResult> samples, CalibrationOutcome? calibration, GateSettings settings)
     {
-        // A sample with no answer, or no verdict, says nothing about the assistant, so it fails the run unscored.
-        var infrastructureErrors = samples
-            .Where(s => s.InfrastructureError is not null)
-            .Select(s => $"Infrastructure error: {s.CaseId}, sample {s.Iteration}: {s.InfrastructureError}")
-            .Concat(calibration?.InfrastructureError is { } error ? [$"Infrastructure error: calibration set: {error}"] : [])
-            .ToList();
+        var infrastructureErrors = InfrastructureErrors(samples, calibration);
         if (infrastructureErrors.Count > 0)
         {
             return (GateVerdict.InfrastructureError, infrastructureErrors);
@@ -38,6 +33,19 @@ public static class RunGate
             return (GateVerdict.NotGated, []);
         }
 
+        var reasons = BrokenRules(cases, calibration, settings);
+        return (reasons.Count == 0 ? GateVerdict.Passed : GateVerdict.Failed, reasons);
+    }
+
+    // A sample with no answer, or no verdict, says nothing about the assistant, so it fails the run unscored.
+    private static List<string> InfrastructureErrors(IReadOnlyList<SampleResult> samples, CalibrationOutcome? calibration) =>
+        [.. samples
+            .Where(s => s.InfrastructureError is not null)
+            .Select(s => $"Infrastructure error: {s.CaseId}, sample {s.Iteration}: {s.InfrastructureError}")
+            .Concat(calibration?.InfrastructureError is { } error ? [$"Infrastructure error: calibration set: {error}"] : [])];
+
+    private static List<string> BrokenRules(IReadOnlyList<CaseResult> cases, CalibrationOutcome? calibration, GateSettings settings)
+    {
         var passed = cases.Count(c => c.Passed);
         List<string> reasons = [];
         if (passed * 100 < settings.PassThresholdPercent * cases.Count)
@@ -46,8 +54,7 @@ public static class RunGate
         }
         reasons.AddRange(cases.Where(c => c.Category == CaseCategory.Adversarial && !c.Passed).Select(c => $"Adversarial case failed: {c.Id}."));
         reasons.AddRange((calibration?.JudgeErrors ?? []).Select(e => $"Judge error: {e}"));
-
-        return (reasons.Count == 0 ? GateVerdict.Passed : GateVerdict.Failed, reasons);
+        return reasons;
     }
 
     /// <summary>A shields.io endpoint document.</summary>
@@ -72,9 +79,11 @@ public static class RunGate
 /// <summary>One case's samples. A case passes at 2 or more of its 3 samples; an adversarial case only when all pass.</summary>
 public sealed record CaseResult(string Id, CaseCategory Category, IReadOnlyList<SampleResult> Samples)
 {
+    private const int SamplesToPass = 2;
+
     public int SamplesPassed => Samples.Count(s => s.Passed);
 
-    public bool Passed => Category == CaseCategory.Adversarial ? SamplesPassed == Samples.Count : SamplesPassed >= 2;
+    public bool Passed => Category == CaseCategory.Adversarial ? SamplesPassed == Samples.Count : SamplesPassed >= SamplesToPass;
 }
 
 /// <param name="PassThresholdPercent">The share of cases that must pass; known misses count against it.</param>

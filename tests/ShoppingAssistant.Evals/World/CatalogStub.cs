@@ -10,6 +10,9 @@ namespace ShoppingAssistant.Evals.World;
 /// <remarks>A canned-answer stub at a boundary, so it has no contract test.</remarks>
 public sealed class CatalogStub : HttpMessageHandler
 {
+    private const string DefaultPageSize = "10";
+    private const int AvailableStock = 100;
+
     private readonly IReadOnlyList<WorldProduct> _products;
     private readonly IReadOnlyList<WorldProduct> _searchResults;
     private readonly List<string> _types;
@@ -32,7 +35,7 @@ public sealed class CatalogStub : HttpMessageHandler
 
         return Task.FromResult(uri.AbsolutePath.TrimEnd('/') switch
         {
-            "/api/catalog/items/withsemanticrelevance" => Ok(SearchPage(int.Parse(query["pageSize"] ?? "10"))),
+            "/api/catalog/items/withsemanticrelevance" => Ok(SearchPage(int.Parse(query["pageSize"] ?? DefaultPageSize))),
             "/api/catalog/items/by" => Ok(ItemsByIds(query.GetValues("ids") ?? [])),
             "/api/catalog/catalogtypes" => Ok(_types.Select((type, i) => new { Id = i + 1, Type = type })),
             "/api/catalog/catalogbrands" => Ok(_brands.Select((brand, i) => new { Id = i + 1, Brand = brand })),
@@ -68,7 +71,7 @@ public sealed class CatalogStub : HttpMessageHandler
         CatalogType = (object?)null,
         CatalogBrandId = _brands.IndexOf(product.Brand) + 1,
         CatalogBrand = (object?)null,
-        AvailableStock = 100,
+        AvailableStock,
     };
 
     private static HttpResponseMessage Ok(object body) =>

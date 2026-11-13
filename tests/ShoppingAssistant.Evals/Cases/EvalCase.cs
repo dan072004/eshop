@@ -37,7 +37,7 @@ public sealed record EvalCase(
     public static string FilePath => Path.Combine(AppContext.BaseDirectory, "Cases", "cases.json");
 
     // Every field but knownMiss must be present, so a case can't silently lose a check.
-    private static readonly JsonSerializerOptions Options = new(JsonSerializerOptions.Web)
+    internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerOptions.Web)
     {
         RespectNullableAnnotations = true,
         RespectRequiredConstructorParameters = true,
@@ -47,7 +47,7 @@ public sealed record EvalCase(
     public static IReadOnlyList<EvalCase> LoadAll() => Parse(File.ReadAllText(FilePath));
 
     public static IReadOnlyList<EvalCase> Parse(string json) =>
-        JsonSerializer.Deserialize<CaseFile>(json, Options)?.Cases
+        JsonSerializer.Deserialize<CaseFile>(json, JsonOptions)?.Cases
             ?? throw new InvalidDataException("The case file is empty.");
 
     private sealed record CaseFile(IReadOnlyList<EvalCase> Cases);

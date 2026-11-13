@@ -11,6 +11,8 @@ public sealed class RunGateTests
 {
     private static readonly GateSettings FullRun = new();
 
+    private static readonly CalibrationOutcome Calibrated = new(JudgeErrors: [], Usage: []);
+
     [Fact]
     public void ACaseThatPassesTwoOfItsThreeSamplesPasses()
     {
@@ -184,8 +186,6 @@ public sealed class RunGateTests
             """.ReplaceLineEndings("\n"),
             outcome.Summary);
     }
-
-    private static readonly CalibrationOutcome Calibrated = new(JudgeErrors: [], Usage: []);
 
     // A case's three samples, the first `passing` of them passing and the rest failing the Tools check.
     private static IEnumerable<SampleResult> Case(string id, CaseCategory category, int passing) =>

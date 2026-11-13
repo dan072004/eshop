@@ -20,6 +20,8 @@ namespace ShoppingAssistant.Evals.Running;
 public sealed class PolicyApiFixture : WebApplicationFactory<PolicyIngestion>
 {
     private const string PostgresName = "policydb";
+    private const string PgvectorImage = "ankane/pgvector";
+    private const string PgvectorTag = "latest";
 
     private readonly SemaphoreSlim _starting = new(1, 1);
     private IHost? _app;
@@ -35,16 +37,7 @@ public sealed class PolicyApiFixture : WebApplicationFactory<PolicyIngestion>
                 return;
             }
 
-            var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions
-            {
-                AssemblyName = typeof(PolicyApiFixture).Assembly.FullName,
-                DisableDashboard = true,
-            });
-            var postgres = builder.AddPostgres(PostgresName).WithImage("ankane/pgvector").WithImageTag("latest");
-            _app = builder.Build();
-
-            await _app.StartAsync(cancellationToken);
-            _postgresConnectionString = await postgres.Resource.GetConnectionStringAsync(cancellationToken);
+            _postgresConnectionString = await StartPostgresAsync(cancellationToken);
 
             // Building the server runs policy-api's startup ingestion.
             _ = Server;
@@ -53,6 +46,20 @@ public sealed class PolicyApiFixture : WebApplicationFactory<PolicyIngestion>
         {
             _starting.Release();
         }
+    }
+
+    private async Task<string?> StartPostgresAsync(CancellationToken cancellationToken)
+    {
+        var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions
+        {
+            AssemblyName = typeof(PolicyApiFixture).Assembly.FullName,
+            DisableDashboard = true,
+        });
+        var postgres = builder.AddPostgres(PostgresName).WithImage(PgvectorImage).WithImageTag(PgvectorTag);
+        _app = builder.Build();
+
+        await _app.StartAsync(cancellationToken);
+        return await postgres.Resource.GetConnectionStringAsync(cancellationToken);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder) =>

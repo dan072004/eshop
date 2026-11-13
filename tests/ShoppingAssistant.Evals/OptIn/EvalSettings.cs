@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using System.Globalization;
+using Microsoft.Extensions.Configuration;
 
 namespace ShoppingAssistant.Evals.OptIn;
 
@@ -18,6 +19,8 @@ public static class EvalSettings
 
     public const string ParallelismVariable = "ESHOP_EVALS_PARALLELISM";
 
+    private const int DefaultParallelism = 4;
+
     /// <summary>
     /// The case ids in <c>ESHOP_EVALS_CASE</c> (comma-separated), or null to run every case. A filtered run writes the
     /// report and the summary, and skips the gate.
@@ -28,8 +31,8 @@ public static class EvalSettings
     /// <summary>How many cases run at once: <c>ESHOP_EVALS_PARALLELISM</c>, or 4.</summary>
     /// <exception cref="InvalidOperationException">The value is not a positive whole number.</exception>
     public static int Parallelism(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? 4
-        : int.TryParse(value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var parallelism) && parallelism > 0 ? parallelism
+        string.IsNullOrWhiteSpace(value) ? DefaultParallelism
+        : int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parallelism) && parallelism > 0 ? parallelism
         : throw new InvalidOperationException($"{ParallelismVariable} is '{value}'; it must be a positive whole number.");
 
     public static bool IsEnabled => Environment.GetEnvironmentVariable(EnvironmentVariable) == "1";
