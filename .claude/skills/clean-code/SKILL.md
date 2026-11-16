@@ -1,6 +1,6 @@
 ---
 name: clean-code
-description: Clean Code rules (Robert C. Martin) for C# — newspaper metaphor, one level of abstraction per method, small well-named functions, no hidden side effects. Use this skill whenever you write, add, edit, refactor or review any .cs file in this repo, even for a small method, and whenever the user says the code is hard to read, messy, "not clean", or asks to clean up, simplify or restructure code.
+description: Clean Code rules (Robert C. Martin) for C# — newspaper metaphor, one level of abstraction per method, small well-named functions, no hidden side effects. Use this skill whenever you write, add, edit, refactor or review any .cs file in this repo, even for a small method, whenever you name or rename a type, file or folder, and whenever the user says the code is hard to read, messy, "not clean", or asks to clean up, simplify or restructure code.
 ---
 
 # Clean Code
@@ -58,6 +58,25 @@ public async Task<JsonArray> RunEvaluation(...)
 
 4. **Names that reveal intent.** Methods are verbs (`GradeOutput`, `LoadDataset`), data are nouns (`testCases`, `averageScore`). Avoid vague names like `func`, `list`, `data`, `temp`. Name the *what*, not the *how* (`GradeAll`, not `RunWithSemaphore`). A good name is what lets the orchestrating method read like prose.
    **Constants are PascalCase:** every `const`, whether a field or a local, and whatever its access (`private`, `internal`, `public`). Write `const string Model`, `const int MaxTokens`, never `model` or `maxTokens`. In an object initializer, `Model = Model` is fine: the right-hand side resolves to the constant. Named-argument labels still follow the parameter names (`Chat(messages, model: Model)`).
+   **Types** name their job, in the framework's own vocabulary:
+   - Suffix a type with its framework family, as the framework names its own: `UsageTrackingChatClient` (after `LoggingChatClient`, `FunctionInvokingChatClient`), `ChatErrorLoggerProvider`, `WriteOnlyCacheProvider`, `ExpectedToolCallsEvaluator`. A base class and its subclasses share the suffix (`DeterministicEvaluator`).
+   - Name the job, and let the base type show the pattern: `UsageTrackingChatClient : DelegatingChatClient`, not `ModelUsageDecorator`.
+   - Give a class a singular noun phrase; a plural (`ModelCalls`, `ModelErrors`) reads as a collection or a count, so keep plurals for those.
+   - A do-nothing implementation is `NullXxx` with a static `Instance` (`NullResultStore`, after `NullLogger`).
+   - Name a check after what it verifies: `CitationsPresentEvaluator`, `ExpectedStringsEvaluator` (it checks the case's expected strings), rather than after the data it reads.
+   - An exception says what went wrong: `InvalidJudgeReplyException`, `ModelCallFailedException`.
+   - A test double is named for how it behaves (`ScriptedModel`, `NumberedAnswers`, `CrashingEvaluator`). *Stub* and *fake* carry the meanings in CLAUDE.md's Testing section.
+
+   **Folders** are namespaces, so they follow the same rules:
+   - Sibling folders read as a set at one level: `CodeGrading` / `ModelGrading` (code-based and model-based grading).
+   - A type two folders share lives where both already depend (`EvalConversation` in `Cases/`), so neither sibling depends on the other.
+   - A domain term used consistently stays (`World`: `EvalWorld`, `world.json`, ADR 0006). Rename a term together with every use of it.
+
+   **Renaming** reaches past what the compiler checks:
+   - Move the file with `git mv` together with its type, and the folder together with its namespace.
+   - Grep for paths the build can't see: csproj items (`<None Update="ModelGrading\calibration.json">`) and `Path.Combine(AppContext.BaseDirectory, "ModelGrading", …)`. A missed one fails only at test time.
+   - Confirm persisted strings (metric names, cache keys, report tags) are literals, so a rename leaves reports and caches lined up.
+   - Leave dated history (`.scratch/**/issues`) as written.
 
 5. **Few arguments.** 0–2 is ideal, 3 at most. Group related arguments into a `record` (e.g. `EvalOptions(string DatasetFile, string JsonOutput, string HtmlOutput)`). A bool flag means the method does two things, so split it into two methods.
    When the same arguments are passed down a whole call chain (for example `runPromptFunction` and `extraCriteria` going `GradeAll` → `RunTestCase` → `GradeOutput`), they are the object's state, so make them constructor parameters. Don't use settable properties, which leave the object half-initialized until someone sets them. Settings that are passed on to helper methods but have sensible defaults (output file paths) become `init`-only properties with those defaults, set in an object initializer. That keeps the constructor at 3 parameters or fewer and the object immutable. Values that only the entry method uses, and that change on every call (the input dataset), stay as parameters.
@@ -93,4 +112,5 @@ Go through the file top-down. For each issue, name the rule, the method, and a c
 - Are progress, logging and concurrency kept out of the business logic?
 - Are there no magic values and no duplicated snippets?
 - Are all `const` names (fields and locals) PascalCase?
+- Does every new or renamed type carry its framework suffix and name its job, and do sibling folders read as a set?
 - Does `dotnet build` succeed?
