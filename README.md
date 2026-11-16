@@ -153,7 +153,7 @@ The Shopping Assistant uses `claude-haiku-4-5` with replies of up to 1024 tokens
 
 [![Shopping Assistant evals](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdan072004%2Feshop%2Fbadges%2Fevals.json)](https://github.com/dan072004/eshop/actions/workflows/evals.yml)
 
-`tests/ShoppingAssistant.Evals` asks the Shopping Assistant 40 fixed questions with a real Claude model and scores every answer. It checks what no fake can: whether the model, given our system prompt, tool descriptions and tool results, still gives the right answer. [ADR 0006](docs/adr/0006-evals-call-a-real-model-outside-the-deterministic-suite.md) records the design and the baseline.
+`tests/ShoppingAssistant.Evals` asks the Shopping Assistant 40 fixed questions with a real Claude model and scores every answer. It checks what no fake can: whether the model, given our system prompt, tool descriptions and tool results, still gives the right answer. [ADR 0006](docs/adr/0006-evals-call-a-real-model-outside-the-deterministic-suite.md) records the design and the baseline. [How an evals run flows](docs/evals-run-flow.md) diagrams one run, class by class.
 
 #### What's tested
 
