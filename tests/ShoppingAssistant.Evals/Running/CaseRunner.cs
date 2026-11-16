@@ -25,13 +25,6 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, Cach
         var errors = new ChatErrorLoggerProvider();
         await using var provider = Services(evalCase, errors).BuildServiceProvider();
         var basket = new OutOfScopeBasket();
-        ChatState Conversation(IChatClient chatClient) => new(
-            basket,
-            basket,
-            Principal(evalCase),
-            provider.GetRequiredService<eShop.Assistant.Tools.AssistantTools>(),
-            provider.GetRequiredService<ILoggerFactory>(),
-            chatClient);
 
         var cachingKeys = await CachingKeysAsync(evalCase, Conversation, cancellationToken);
         var sample = await model.OpenAsync(evalCase.Id, iterationName, cachingKeys, cancellationToken);
@@ -39,6 +32,14 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, Cach
         await SendTurnsAsync(chat, evalCase, errors);
 
         return new CaseTranscript(chat.Messages.ToList()) { CachingKeys = cachingKeys, ModelCalls = sample.ModelCalls, Usage = sample.Usage };
+
+        ChatState Conversation(IChatClient chatClient) => new(
+            basket,
+            basket,
+            Principal(evalCase),
+            provider.GetRequiredService<eShop.Assistant.Tools.AssistantTools>(),
+            provider.GetRequiredService<ILoggerFactory>(),
+            chatClient);
     }
 
     // The tools library over the real policy-api and the world's stubs, logging model errors to errors.
