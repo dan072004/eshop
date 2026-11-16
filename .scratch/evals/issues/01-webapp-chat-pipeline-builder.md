@@ -19,8 +19,9 @@ See the evals spec's "WebApp: the chat pipeline as one builder".
 - [x] The existing chat-provider registration tests pass unchanged
 - [x] The existing Shopping Assistant tests pass unchanged
 - [x] The builder can be called from another assembly with any inner `IChatClient`, and returns a client with function invocation and the thinking-off option applied
-- [ ] With `ChatProvider=Claude`, `aspire run` still answers a chat message as before (manual check)
+- [x] With `ChatProvider=Claude`, `aspire run` still answers a chat message as before (manual check)
 
 ## Comments
 
 - 2026-11-09: Merged into `evals` (commit a1686b6). `dotnet build eShop.Web.slnf` passed and `tests/WebApp.UnitTests` passed (29/29), which covers the three automated checks. The manual check (`aspire run` with `ChatProvider=Claude` answering a chat message) is still open.
+- 2026-11-16: Manual check done: with `ChatProvider=Claude`, `aspire run` answered a chat message as before (confirmed by the maintainer, at commit 3ac516c).
