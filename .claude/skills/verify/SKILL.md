@@ -15,7 +15,7 @@ git diff main...HEAD --name-only     # committed on this branch
 git diff HEAD --name-only            # uncommitted
 ```
 
-Focus on the files changed in this task. If nothing under `src/`, `tests/`, `e2e/`, `*.props`, `global.json` or `eShop.Web.slnf` changed, report "docs-only, nothing to verify" and stop.
+Focus on the files changed in this task. If nothing under `src/`, `tests/`, `e2e/`, `policies/`, `*.props`, `global.json` or `eShop.Web.slnf` changed, report "docs-only, nothing to verify" and stop. If `.github/workflows/evals.yml` changed, add the evals row from step 4 first.
 
 ## 2. Build (always)
 
@@ -39,12 +39,20 @@ dotnet format whitespace . --folder --verify-no-changes --include <changed .cs f
 | `src/Webhooks.API` | `tests/Webhooks.FunctionalTests` |
 | `src/WebApp`, `src/WebAppComponents` | `tests/Application.UnitTests` + UI check (step 6) |
 | `src/eShop.AppHost` | `tests/eShop.AppHost.UnitTests` |
+| `src/eShop.Assistant.Tools` | `tests/eShop.Assistant.Tools.UnitTests`, `tests/ShoppingAssistant.Evals` (fast tests only) + the evals row |
+| `src/Policy.API`, `policies/` | `tests/Policy.UnitTests`, `tests/Policy.FunctionalTests` + the evals row |
 | `src/EventBus*`, `src/IntegrationEventLogEF`, `src/eShop.ServiceDefaults`, `src/Shared`, `Directory.*.props`, `global.json` | everything: `dotnet test --solution eShop.Web.slnf` |
 | `tests/X` | `tests/X` |
 
 - Use `dotnet test --project <path>` (Microsoft.Testing.Platform). VSTest flags like `-nologo` fail.
 - Functional tests start Postgres, Redis and Identity containers. If no container runtime is running, mark them SKIPPED with that reason. Never drop them silently.
 - If the change adds behaviour but no test was added or changed, add a row saying so.
+
+**Evals.** The assistant's paths are the ones `.github/workflows/evals.yml` runs the evals for: `src/WebApp/Components/Chatbot/`, `src/WebApp/Extensions/`, `src/eShop.Assistant.Tools/`, `src/Policy.API/`, `policies/`, `tests/ShoppingAssistant.Evals/` and `.github/workflows/evals.yml`.
+
+- If any of them changed, add the row `Evals | SKIPPED | evals: not run, opt-in`. The evals call a real Claude model and cost about $1 a run (ADR 0006), so CI runs them on the PR, or the user opts in locally (see CLAUDE.md's Commands).
+- Never run the evals yourself: never set `ESHOP_EVALS`, `ESHOP_EVALS_FRESH` or an API key. `tests/ShoppingAssistant.Evals` without `ESHOP_EVALS=1` runs only the eval project's fast tests; run it like that when the project changed.
+- This is the one SKIPPED row that still allows **Verified**, because it is skipped by design, not for lack of a container runtime or a UI.
 
 ## 5. Contract checks
 
@@ -78,10 +86,11 @@ Use exactly this format:
 | Format | PASS | 3 files clean |
 | Ordering.UnitTests | PASS | 142/142 passed |
 | Ordering.FunctionalTests | SKIPPED | Docker not running. Start it and re-run |
-| UI: My Orders cancel | PASS | cancelled order #12, status shows Cancelled |
+| UI: My Orders cancel | PASS | cancelled order 12, status shows Cancelled |
+| Evals | SKIPPED | evals: not run, opt-in |
 | Request coverage | PASS | 3/3 asks addressed |
 
-End with one line: **Verified** or **Not verified: \<what's left\>**. Never round a FAIL or SKIPPED up to "done".
+End with one line: **Verified** or **Not verified: \<what's left\>**. Never round a FAIL or SKIPPED up to "done" (the evals row is the exception, see step 4).
 
 If no row is FAIL, record the stamp so the commit gate lets the changes through:
 

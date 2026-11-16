@@ -1,8 +1,8 @@
-﻿using System.Globalization;
-using Anthropic;
+﻿using Anthropic;
 using Anthropic.Core;
 using eShop.Assistant.Tools;
 using eShop.Basket.API.Grpc;
+using eShop.WebApp.Chatbot;
 using eShop.WebApp.Services.AccessTokens;
 using eShop.WebApp.Services.OrderStatus.IntegrationEvents;
 using eShop.WebAppComponents.Services;
@@ -113,15 +113,18 @@ public static class Extensions
     /// </exception>
     public static void AddChatProvider(this IHostApplicationBuilder builder)
     {
-        var chatClientBuilder = GetChatProvider(builder.Configuration) switch
+        switch (GetChatProvider(builder.Configuration))
         {
-            ChatProvider.Ollama => builder.AddOllamaChatClient(),
-            ChatProvider.Foundry => builder.AddOpenAIClientFromConfiguration("chatModel").AddChatClient(),
-            ChatProvider.Claude => builder.AddClaudeChatClient(),
-            _ => null
-        };
-
-        chatClientBuilder?.UseFunctionInvocation();
+            case ChatProvider.Ollama:
+                builder.AddOllamaChatClient().UseFunctionInvocation();
+                break;
+            case ChatProvider.Foundry:
+                builder.AddOpenAIClientFromConfiguration("chatModel").AddChatClient().UseFunctionInvocation();
+                break;
+            case ChatProvider.Claude:
+                builder.AddClaudeChatClient(); // ClaudeChatPipeline adds function invocation.
+                break;
+        }
     }
 
     private enum ChatProvider { None, Ollama, Foundry, Claude }
@@ -167,7 +170,7 @@ public static class Extensions
     }
 
     // There is no Aspire client integration for Anthropic, so the client is built from the official SDK.
-    private static ChatClientBuilder AddClaudeChatClient(this IHostApplicationBuilder builder)
+    private static void AddClaudeChatClient(this IHostApplicationBuilder builder)
     {
         const string KeySetting = "ANTHROPIC_API_KEY";
 
@@ -179,30 +182,12 @@ public static class Extensions
                 $"ChatProvider is Claude, but the {KeySetting} setting is missing. Set the AppHost's anthropic-api-key parameter.");
         }
 
-        // Defaults suit a quick shopping helper; override them under Claude:ModelId and Claude:MaxOutputTokens.
-        var claude = builder.Configuration.GetSection("Claude");
-        var modelId = claude["ModelId"] is { Length: > 0 } configuredModelId ? configuredModelId : "claude-haiku-4-5";
-        var maxOutputTokens = GetMaxOutputTokens(claude["MaxOutputTokens"]);
+        // Reading the settings here also makes an invalid Claude:MaxOutputTokens fail at startup.
+        var configuration = builder.Configuration;
+        var anthropic = new AnthropicClient(new ClientOptions { ApiKey = apiKey })
+            .AsIChatClient(ClaudeChatPipeline.GetModelId(configuration), ClaudeChatPipeline.GetMaxOutputTokens(configuration));
 
-        var chatClient = new AnthropicClient(new ClientOptions { ApiKey = apiKey })
-            .AsIChatClient(modelId, maxOutputTokens);
-
-        // The adapter has no "off" thinking mode; ReasoningEffort.None is what makes it send thinking.type=disabled.
-        return builder.Services.AddChatClient(chatClient)
-            .ConfigureOptions(options => options.Reasoning ??= new ReasoningOptions { Effort = ReasoningEffort.None });
-    }
-
-    private static int GetMaxOutputTokens(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return 1024;
-        }
-
-        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var maxOutputTokens) && maxOutputTokens > 0
-            ? maxOutputTokens
-            : throw new InvalidOperationException(
-                $"The Claude:MaxOutputTokens setting has the invalid value '{value}'. It must be a positive whole number.");
+        builder.Services.AddChatClient(services => ClaudeChatPipeline.Build(anthropic, configuration, services));
     }
 
     public static async Task<string?> GetBuyerIdAsync(this AuthenticationStateProvider authenticationStateProvider)

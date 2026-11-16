@@ -3,6 +3,8 @@
 ###############################################################################
 * text=auto
 *.sh text eol=lf
+# The build regenerates the OpenAPI documents with LF; check them out the same way so a build leaves them unchanged.
+src/Catalog.API/Catalog.API*.json text eol=lf
 
 ###############################################################################
 # Set default behavior for command prompt diff.

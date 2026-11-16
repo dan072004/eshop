@@ -64,6 +64,7 @@ For "what's the return window for my last order?" on a shipped order containing 
 38. As a maintainer, I want ingestion and both search modes tested against real Postgres, so that the SQL that does the work is the thing under test.
 39. As a maintainer, I want the tools tested with only outbound HTTP faked, so that their results are checked without starting any services.
 40. As a maintainer, I want CI to need no embedding model and no API key, so that tests stay free and deterministic.
+    - **Superseded for the eval project by ADR 0006** (`docs/adr/0006-evals-call-a-real-model-outside-the-deterministic-suite.md`). `tests/ShoppingAssistant.Evals` calls a real Claude model, with a key from the `evals` environment in CI. The deterministic suite keeps this rule.
 41. As a maintainer, I want a way to check retrieval quality against a real embedding model on demand, so that I can tell whether semantic search actually finds the right Policy Section.
 
 ## Implementation Decisions
