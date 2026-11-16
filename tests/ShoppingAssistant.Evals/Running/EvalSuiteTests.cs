@@ -6,7 +6,7 @@ using Microsoft.Extensions.Configuration;
 using eShop.WebApp.Chatbot;
 using ShoppingAssistant.Evals.Cases;
 using ShoppingAssistant.Evals.Gate;
-using ShoppingAssistant.Evals.Judge;
+using ShoppingAssistant.Evals.ModelGrading;
 using ShoppingAssistant.Evals.OptIn;
 using ShoppingAssistant.Evals.World;
 

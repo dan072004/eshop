@@ -3,10 +3,9 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
 using Microsoft.Extensions.AI.Evaluation.Reporting;
 using ShoppingAssistant.Evals.Cases;
-using ShoppingAssistant.Evals.Checks;
 using ShoppingAssistant.Evals.Gate;
 
-namespace ShoppingAssistant.Evals.Judge;
+namespace ShoppingAssistant.Evals.ModelGrading;
 
 /// <summary>
 /// Grades the final answer against the case's <c>reference</c> and <c>rubric</c> with one judge call per sample. The
@@ -120,14 +119,14 @@ public sealed class RubricEvaluator : IEvaluator
         prompt.AppendLine("</rubric>");
     }
 
-    /// <exception cref="JudgeReplyException">The reply is not one verdict for each rubric item, numbered from 1.</exception>
+    /// <exception cref="InvalidJudgeReplyException">The reply is not one verdict for each rubric item, numbered from 1.</exception>
     private static Dictionary<int, JudgeVerdict> VerdictsByItem(ChatResponse<JudgeVerdicts> response, EvalCase evalCase)
     {
         var verdicts = response.TryGetResult(out var result) ? result.Verdicts : null;
         var byItem = verdicts?.GroupBy(v => v.Item).ToDictionary(g => g.Key, g => g.First()) ?? [];
         if (verdicts is null || byItem.Count != evalCase.Rubric.Count || !Enumerable.Range(1, evalCase.Rubric.Count).All(byItem.ContainsKey))
         {
-            throw new JudgeReplyException(evalCase.Id, evalCase.Rubric.Count, response.Text);
+            throw new InvalidJudgeReplyException(evalCase.Id, evalCase.Rubric.Count, response.Text);
         }
 
         return byItem;
@@ -154,7 +153,7 @@ public sealed class RubricEvaluator : IEvaluator
 }
 
 /// <summary>The judge replied, but not with one verdict per rubric item. Like a failed call, it is an infrastructure error.</summary>
-public sealed class JudgeReplyException(string caseId, int rubricItems, string reply)
+public sealed class InvalidJudgeReplyException(string caseId, int rubricItems, string reply)
     : Exception($"Case '{caseId}': the judge did not return one verdict for each of the {rubricItems} rubric items. It replied: {reply}");
 
 /// <summary>

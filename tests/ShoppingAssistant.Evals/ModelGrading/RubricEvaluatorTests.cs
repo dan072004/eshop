@@ -1,8 +1,7 @@
 ﻿using Microsoft.Extensions.AI.Evaluation;
 using ShoppingAssistant.Evals.Cases;
-using ShoppingAssistant.Evals.Checks;
 
-namespace ShoppingAssistant.Evals.Judge;
+namespace ShoppingAssistant.Evals.ModelGrading;
 
 /// <summary>
 /// The rubric evaluator at the evaluator seam, with the judge's real Anthropic client and only the Anthropic API

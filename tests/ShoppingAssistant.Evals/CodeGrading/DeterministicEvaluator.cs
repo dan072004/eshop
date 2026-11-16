@@ -2,13 +2,13 @@
 using Microsoft.Extensions.AI.Evaluation;
 using ShoppingAssistant.Evals.Cases;
 
-namespace ShoppingAssistant.Evals.Checks;
+namespace ShoppingAssistant.Evals.CodeGrading;
 
 /// <summary>
 /// A check that needs no model: it reads the conversation and the case (<see cref="EvalCaseContext"/>) and returns one
 /// metric, already interpreted, so the report shows its verdict and reason and a sample fails when any metric failed.
 /// </summary>
-public abstract class DeterministicCheck : IEvaluator
+public abstract class DeterministicEvaluator : IEvaluator
 {
     public abstract string MetricName { get; }
 

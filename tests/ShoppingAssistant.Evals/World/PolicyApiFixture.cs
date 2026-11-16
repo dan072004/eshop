@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
-namespace ShoppingAssistant.Evals.Running;
+namespace ShoppingAssistant.Evals.World;
 
 /// <summary>
 /// The real policy-api over a real Postgres (with pgvector, as the AppHost uses), indexing the real Policies (the copy

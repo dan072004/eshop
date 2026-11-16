@@ -1,13 +1,13 @@
 ﻿using Microsoft.Extensions.AI.Evaluation;
 using ShoppingAssistant.Evals.Cases;
 
-namespace ShoppingAssistant.Evals.Checks;
+namespace ShoppingAssistant.Evals.CodeGrading;
 
 /// <summary>
 /// Every <c>mustCallTools</c> entry was called, and no <c>mustNotCallTools</c> entry was. Basket tools are out of the
 /// evals' scope, so a call to one is forbidden too unless the case requires it.
 /// </summary>
-public sealed class ToolsEvaluator : DeterministicCheck
+public sealed class ExpectedToolCallsEvaluator : DeterministicEvaluator
 {
     // The conversation class's own basket functions, named after their methods.
     private static readonly string[] BasketTools = ["AddToCart", "GetCartContents"];

@@ -24,10 +24,10 @@ public static class ResponseCache
     public static IEvaluationResponseCacheProvider Provider(string storePath, bool fresh)
     {
         var disk = new DiskBasedResponseCacheProvider(storePath, TimeToLive);
-        return fresh ? new WriteOnlyProvider(disk) : disk;
+        return fresh ? new WriteOnlyCacheProvider(disk) : disk;
     }
 
-    private sealed class WriteOnlyProvider(IEvaluationResponseCacheProvider inner) : IEvaluationResponseCacheProvider
+    private sealed class WriteOnlyCacheProvider(IEvaluationResponseCacheProvider inner) : IEvaluationResponseCacheProvider
     {
         public async ValueTask<IDistributedCache> GetCacheAsync(string scenarioName, string iterationName, CancellationToken cancellationToken = default) =>
             new WriteOnlyCache(await inner.GetCacheAsync(scenarioName, iterationName, cancellationToken));
@@ -70,16 +70,16 @@ public sealed class CachedModel(IChatClient model, IEvaluationResponseCacheProvi
     public async Task<CachedSample> OpenAsync(
         string caseId, string iterationName, IEnumerable<string> cachingKeys, CancellationToken cancellationToken)
     {
-        var calls = new ModelCalls(model);
+        var calls = new UsageTrackingChatClient(model);
 
         // Only the run's chat client is used: the run is never evaluated, so it writes no result to the store.
-        var answers = new ReportingConfiguration([], NoResults.Instance, new ChatConfiguration(calls), cache);
+        var answers = new ReportingConfiguration([], NullResultStore.Instance, new ChatConfiguration(calls), cache);
         var run = await answers.CreateScenarioRunAsync(caseId, iterationName, cachingKeys, cancellationToken: cancellationToken);
         return new CachedSample(run.ChatConfiguration!.ChatClient, () => calls.Count, () => calls.Usage);
     }
 
     // Below the cache, so it sees only the calls the cache missed: those are the ones that reached, and cost, the model.
-    private sealed class ModelCalls(IChatClient inner) : DelegatingChatClient(inner)
+    private sealed class UsageTrackingChatClient(IChatClient inner) : DelegatingChatClient(inner)
     {
         private readonly List<Gate.TokenUsage> _usage = [];
         private int _count;
@@ -123,9 +123,9 @@ public sealed class CachedModel(IChatClient model, IEvaluationResponseCacheProvi
         protected override void Dispose(bool disposing) { }
     }
 
-    private sealed class NoResults : IEvaluationResultStore
+    private sealed class NullResultStore : IEvaluationResultStore
     {
-        public static NoResults Instance { get; } = new();
+        public static NullResultStore Instance { get; } = new();
 
         public IAsyncEnumerable<ScenarioRunResult> ReadResultsAsync(
             string? executionName = null, string? scenarioName = null, string? iterationName = null, CancellationToken cancellationToken = default) =>

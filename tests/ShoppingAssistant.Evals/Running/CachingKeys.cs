@@ -2,7 +2,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
-using ShoppingAssistant.Evals.Judge;
+using ShoppingAssistant.Evals.ModelGrading;
 
 namespace ShoppingAssistant.Evals.Running;
 

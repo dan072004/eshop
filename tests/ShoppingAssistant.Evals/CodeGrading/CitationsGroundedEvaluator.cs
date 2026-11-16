@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.AI.Evaluation;
 using ShoppingAssistant.Evals.Cases;
 
-namespace ShoppingAssistant.Evals.Checks;
+namespace ShoppingAssistant.Evals.CodeGrading;
 
 /// <summary>
 /// Every Citation in the final answer appeared as a <c>citation</c> value in a <c>search_policies</c> result in the
@@ -12,7 +12,7 @@ namespace ShoppingAssistant.Evals.Checks;
 /// returned Citation sits exactly around it. An intro section's Citation is the bare Policy title, which has no
 /// <c>›</c> to find; <c>mustCite</c> and the judge cover those.
 /// </remarks>
-public sealed class CitationsGroundedEvaluator : DeterministicCheck
+public sealed class CitationsGroundedEvaluator : DeterministicEvaluator
 {
     private const char Separator = '›';
 

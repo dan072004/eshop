@@ -2,14 +2,14 @@
 using Microsoft.Extensions.AI.Evaluation;
 using ShoppingAssistant.Evals.Cases;
 
-namespace ShoppingAssistant.Evals.Checks;
+namespace ShoppingAssistant.Evals.CodeGrading;
 
 /// <summary>
 /// Every <c>mustContain</c> literal appears in the assistant's answers, and no <c>mustNotContain</c> literal does, in
 /// any turn: a leak in an earlier answer counts. Literals match as whole tokens, so order 202 is not found in the year
 /// 2026, and the match is case-sensitive.
 /// </summary>
-public sealed class StringsEvaluator : DeterministicCheck
+public sealed class ExpectedStringsEvaluator : DeterministicEvaluator
 {
     public override string MetricName => "Strings";
 

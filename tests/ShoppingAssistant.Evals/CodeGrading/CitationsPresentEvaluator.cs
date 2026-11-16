@@ -1,10 +1,10 @@
 ﻿using Microsoft.Extensions.AI.Evaluation;
 using ShoppingAssistant.Evals.Cases;
 
-namespace ShoppingAssistant.Evals.Checks;
+namespace ShoppingAssistant.Evals.CodeGrading;
 
 /// <summary>Every <c>mustCite</c> string appears, exactly (case and punctuation included), in the final answer.</summary>
-public sealed class CitationsPresentEvaluator : DeterministicCheck
+public sealed class CitationsPresentEvaluator : DeterministicEvaluator
 {
     public override string MetricName => "Citations present";
 

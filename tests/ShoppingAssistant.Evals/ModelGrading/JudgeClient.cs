@@ -2,7 +2,7 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
 
-namespace ShoppingAssistant.Evals.Judge;
+namespace ShoppingAssistant.Evals.ModelGrading;
 
 /// <summary>
 /// The judge: <c>claude-sonnet-5-5</c> at low effort, a stronger model than the Haiku 4.5 it grades, on a fresh
@@ -12,7 +12,7 @@ namespace ShoppingAssistant.Evals.Judge;
 /// </summary>
 /// <remarks>
 /// The Anthropic SDK sends no temperature, top_p or top_k, so the judge's sampling can't be pinned; the calibration
-/// set (<c>Judge/calibration.json</c>) is what shows it grades correctly. Raise <see cref="Effort"/> only when the
+/// set (<c>ModelGrading/calibration.json</c>) is what shows it grades correctly. Raise <see cref="Effort"/> only when the
 /// calibration set catches a misgrade the rubric wording can't fix.
 /// </remarks>
 public static class JudgeClient

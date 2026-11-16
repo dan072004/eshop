@@ -1,7 +1,7 @@
 ﻿using eShop.Assistant.Tools;
 using Microsoft.Extensions.AI;
 
-namespace ShoppingAssistant.Evals.Checks;
+namespace ShoppingAssistant.Evals.Cases;
 
 /// <summary>
 /// What the checks read from a finished conversation: every tool call and its result, the answers, and the final answer.

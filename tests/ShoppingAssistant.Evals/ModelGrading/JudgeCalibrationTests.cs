@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.AI.Evaluation;
 using ShoppingAssistant.Evals.Cases;
 
-namespace ShoppingAssistant.Evals.Judge;
+namespace ShoppingAssistant.Evals.ModelGrading;
 
 /// <summary>
 /// The calibration set's own logic, with the Anthropic API faked: a verdict that differs from its label is a judge

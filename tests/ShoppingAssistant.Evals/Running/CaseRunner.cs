@@ -22,7 +22,7 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, Cach
     public async Task<CaseTranscript> RunAsync(
         EvalCase evalCase, string iterationName = Defaults.DefaultIterationName, CancellationToken cancellationToken = default)
     {
-        var errors = new ModelErrors();
+        var errors = new ChatErrorLoggerProvider();
         await using var provider = Services(evalCase, errors).BuildServiceProvider();
         var basket = new OutOfScopeBasket();
         ChatState Conversation(IChatClient chatClient) => new(
@@ -42,7 +42,7 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, Cach
     }
 
     // The tools library over the real policy-api and the world's stubs, logging model errors to errors.
-    private IServiceCollection Services(EvalCase evalCase, ModelErrors errors)
+    private IServiceCollection Services(EvalCase evalCase, ChatErrorLoggerProvider errors)
     {
         var services = new ServiceCollection().AddLogging(logging => logging.AddProvider(errors));
         var tools = services.AddEvalWorld(world, evalCase.SignedInAs, evalCase.CatalogResults);
@@ -64,7 +64,7 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, Cach
             await File.ReadAllTextAsync(EvalWorld.FilePath, cancellationToken));
 
     /// <exception cref="ModelCallFailedException">A model call failed.</exception>
-    private static async Task SendTurnsAsync(ChatState chat, EvalCase evalCase, ModelErrors errors)
+    private static async Task SendTurnsAsync(ChatState chat, EvalCase evalCase, ChatErrorLoggerProvider errors)
     {
         foreach (var turn in evalCase.Turns)
         {
@@ -105,7 +105,7 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, Cach
     }
 
     // Records the exception the conversation class logs when a model call fails.
-    private sealed class ModelErrors : ILoggerProvider
+    private sealed class ChatErrorLoggerProvider : ILoggerProvider
     {
         // What the conversation class logs when a model call fails.
         private const string ChatError = "Error getting chat completions.";
@@ -117,7 +117,7 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, Cach
 
         public void Dispose() { }
 
-        private sealed class Logger(ModelErrors errors) : ILogger
+        private sealed class Logger(ChatErrorLoggerProvider errors) : ILogger
         {
             public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 

@@ -1,11 +1,11 @@
 ﻿using Anthropic;
 using Microsoft.Extensions.AI.Evaluation;
 using Microsoft.Extensions.AI.Evaluation.Reporting;
-using ShoppingAssistant.Evals.Checks;
+using ShoppingAssistant.Evals.Cases;
 using ShoppingAssistant.Evals.Gate;
 using ShoppingAssistant.Evals.Running;
 
-namespace ShoppingAssistant.Evals.Judge;
+namespace ShoppingAssistant.Evals.ModelGrading;
 
 /// <summary>
 /// The calibration set graded by the real judge, once per test run: the calibration fact asserts on it and the suite's

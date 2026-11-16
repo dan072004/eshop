@@ -1,9 +1,8 @@
 ﻿using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
-using ShoppingAssistant.Evals.Cases;
 using ShoppingAssistant.Evals.Running;
 
-namespace ShoppingAssistant.Evals.Checks;
+namespace ShoppingAssistant.Evals.Cases;
 
 /// <summary>
 /// A conversation written by hand, shaped like the one the Shopping Assistant's conversation class leaves behind: the

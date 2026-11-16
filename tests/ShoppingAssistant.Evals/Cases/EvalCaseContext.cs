@@ -1,8 +1,7 @@
 ﻿using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
-using ShoppingAssistant.Evals.Cases;
 
-namespace ShoppingAssistant.Evals.Checks;
+namespace ShoppingAssistant.Evals.Cases;
 
 /// <summary>Hands every check the case it is scoring: its expectations and its Buyer.</summary>
 public sealed class EvalCaseContext(EvalCase evalCase) : EvaluationContext(ContextName, new TextContent(evalCase.Id))

@@ -2,7 +2,7 @@
 using Microsoft.Extensions.AI.Evaluation;
 using Microsoft.Extensions.AI.Evaluation.Reporting;
 using ShoppingAssistant.Evals.Cases;
-using ShoppingAssistant.Evals.Checks;
+using ShoppingAssistant.Evals.CodeGrading;
 using ShoppingAssistant.Evals.Gate;
 
 namespace ShoppingAssistant.Evals.Running;
@@ -35,7 +35,7 @@ public sealed class SampleScoringTests
     public async Task ACheckThatThrowsMakesTheSampleAnInfrastructureErrorNotAPass()
     {
         // Composed as Reporting composes evaluators, which records an evaluator's exception on its metric.
-        var evaluation = await ShippingAnswer.EvaluateAllAsync(new CompositeEvaluator(new ToolsEvaluator(), new CrashingCheck()), ShippingCase);
+        var evaluation = await ShippingAnswer.EvaluateAllAsync(new CompositeEvaluator(new ExpectedToolCallsEvaluator(), new CrashingEvaluator()), ShippingCase);
 
         var sample = SampleScoring.Score(ShippingCase, Transcript(), Stored(evaluation));
 
@@ -52,7 +52,7 @@ public sealed class SampleScoringTests
     [Fact]
     public async Task AJudgeCallThatReachedTheModelIsCountedEvenWhenTheChatTurnsWereReplayedAndAReplayedOneIsNot()
     {
-        var evaluation = await ShippingAnswer.EvaluateAllAsync(new ToolsEvaluator(), ShippingCase);
+        var evaluation = await ShippingAnswer.EvaluateAllAsync(new ExpectedToolCallsEvaluator(), ShippingCase);
 
         // The chat turns were replayed (no model calls), as after a change to the judge's settings.
         var rejudged = SampleScoring.Score(ShippingCase, Transcript(), Stored(evaluation, JudgeCall(cacheHit: false)));
@@ -83,7 +83,7 @@ public sealed class SampleScoringTests
         new ChatDetails(judgeCalls));
 
     // A check with a bug: it throws instead of returning a verdict.
-    private sealed class CrashingCheck : DeterministicCheck
+    private sealed class CrashingEvaluator : DeterministicEvaluator
     {
         public override string MetricName => "Crashing";
 

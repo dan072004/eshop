@@ -3,8 +3,8 @@ using System.Reflection;
 using Microsoft.Extensions.AI.Evaluation;
 using Microsoft.Extensions.AI.Evaluation.Reporting;
 using Microsoft.Extensions.AI.Evaluation.Reporting.Storage;
-using ShoppingAssistant.Evals.Checks;
-using ShoppingAssistant.Evals.Judge;
+using ShoppingAssistant.Evals.CodeGrading;
+using ShoppingAssistant.Evals.ModelGrading;
 using ShoppingAssistant.Evals.World;
 
 namespace ShoppingAssistant.Evals.Running;
@@ -31,10 +31,10 @@ public static class EvalReporting
 
     public static IReadOnlyList<IEvaluator> DeterministicChecks(EvalWorld world) =>
     [
-        new ToolsEvaluator(),
+        new ExpectedToolCallsEvaluator(),
         new CitationsPresentEvaluator(),
         new CitationsGroundedEvaluator(),
-        new StringsEvaluator(),
+        new ExpectedStringsEvaluator(),
         new OtherBuyersOrdersEvaluator(world),
     ];
 

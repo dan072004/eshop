@@ -2,12 +2,11 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
 using ShoppingAssistant.Evals.Cases;
-using ShoppingAssistant.Evals.Checks;
 
-namespace ShoppingAssistant.Evals.Judge;
+namespace ShoppingAssistant.Evals.ModelGrading;
 
 /// <summary>
-/// The judge's calibration set (<c>Judge/calibration.json</c>): fixed answers, each labelled with the verdict every
+/// The judge's calibration set (<c>ModelGrading/calibration.json</c>): fixed answers, each labelled with the verdict every
 /// rubric item should get. Some answers are correct; others are subtly wrong. The judge grades them as it grades a
 /// sample, and any verdict that differs from its label is a <see cref="JudgeError"/>: the judge is broken, not the
 /// assistant.
@@ -17,7 +16,7 @@ public static class JudgeCalibration
     /// <summary>Calibration scenarios are named with this prefix, so the report and the gate keep them apart from cases.</summary>
     public const string ScenarioPrefix = "judge-calibration.";
 
-    public static string FilePath => Path.Combine(AppContext.BaseDirectory, "Judge", "calibration.json");
+    public static string FilePath => Path.Combine(AppContext.BaseDirectory, "ModelGrading", "calibration.json");
 
     public static IReadOnlyList<CalibrationAnswer> LoadAll() =>
         JsonSerializer.Deserialize<CalibrationFile>(File.ReadAllText(FilePath), EvalCase.JsonOptions)?.Answers

@@ -1,9 +1,8 @@
 ﻿using Microsoft.Extensions.AI.Evaluation;
 using Microsoft.Extensions.AI.Evaluation.Reporting;
 using ShoppingAssistant.Evals.Cases;
-using ShoppingAssistant.Evals.Checks;
 using ShoppingAssistant.Evals.Gate;
-using ShoppingAssistant.Evals.Judge;
+using ShoppingAssistant.Evals.ModelGrading;
 
 namespace ShoppingAssistant.Evals.Running;
 

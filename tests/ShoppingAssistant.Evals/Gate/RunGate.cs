@@ -1,5 +1,5 @@
 ﻿using ShoppingAssistant.Evals.Cases;
-using ShoppingAssistant.Evals.Judge;
+using ShoppingAssistant.Evals.ModelGrading;
 
 namespace ShoppingAssistant.Evals.Gate;
 

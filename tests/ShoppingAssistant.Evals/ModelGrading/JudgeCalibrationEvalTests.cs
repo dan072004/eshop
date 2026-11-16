@@ -1,7 +1,7 @@
 ﻿using ShoppingAssistant.Evals.OptIn;
 using ShoppingAssistant.Evals.Running;
 
-namespace ShoppingAssistant.Evals.Judge;
+namespace ShoppingAssistant.Evals.ModelGrading;
 
 /// <summary>
 /// The judge, checked against its calibration set with the real Sonnet 5.5: every labelled answer must get the

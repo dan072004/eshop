@@ -1,7 +1,7 @@
 ﻿using System.Text;
 using Anthropic;
 
-namespace ShoppingAssistant.Evals.Judge;
+namespace ShoppingAssistant.Evals.ModelGrading;
 
 /// <summary>
 /// Fakes the Anthropic Messages API, a boundary we don't own: each request is answered with the next judge reply,

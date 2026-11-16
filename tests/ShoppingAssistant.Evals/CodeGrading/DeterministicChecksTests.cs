@@ -2,7 +2,7 @@
 using ShoppingAssistant.Evals.Cases;
 using ShoppingAssistant.Evals.World;
 
-namespace ShoppingAssistant.Evals.Checks;
+namespace ShoppingAssistant.Evals.CodeGrading;
 
 /// <summary>
 /// The deterministic checks at the evaluator seam: hand-built conversations go in, verdicts come out. No model is
@@ -36,7 +36,7 @@ public sealed class DeterministicChecksTests
             .Tool("search_policies", """{ "mode": "keyword", "results": [] }""")
             .Answer("You have 60 days.");
 
-        var metric = await conversation.EvaluateAsync(new ToolsEvaluator(), AcceptanceCase);
+        var metric = await conversation.EvaluateAsync(new ExpectedToolCallsEvaluator(), AcceptanceCase);
 
         Assert.Equivalent(
             new { Name = "Tools", Value = false, Reason = "Not called: get_order.", Interpretation = new { Failed = true } },
@@ -53,7 +53,7 @@ public sealed class DeterministicChecksTests
             .Answer("Order 101 has shipped.");
         var evalCase = AcceptanceCase with { MustCallTools = ["get_order"], MustNotCallTools = ["search_catalog"] };
 
-        var metric = await conversation.EvaluateAsync(new ToolsEvaluator(), evalCase);
+        var metric = await conversation.EvaluateAsync(new ExpectedToolCallsEvaluator(), evalCase);
 
         Assert.Equivalent(
             new { Name = "Tools", Value = false, Reason = "Called but forbidden: search_catalog.", Interpretation = new { Failed = true } },
@@ -68,7 +68,7 @@ public sealed class DeterministicChecksTests
             .Tool("AddToCart", "\"Unable to add the item to the cart.\"", new() { ["itemId"] = 9 })
             .Answer("Sorry, I couldn't add it.");
 
-        var metric = await conversation.EvaluateAsync(new ToolsEvaluator(), AcceptanceCase);
+        var metric = await conversation.EvaluateAsync(new ExpectedToolCallsEvaluator(), AcceptanceCase);
 
         Assert.Equivalent(
             new { Name = "Tools", Value = false, Reason = "Called but forbidden: AddToCart.", Interpretation = new { Failed = true } },
@@ -78,7 +78,7 @@ public sealed class DeterministicChecksTests
     [Fact]
     public async Task CallingEveryRequiredToolPassesTheToolsCheckAndNamesTheCallsInOrder()
     {
-        var metric = await AcceptanceAnswer().EvaluateAsync(new ToolsEvaluator(), AcceptanceCase);
+        var metric = await AcceptanceAnswer().EvaluateAsync(new ExpectedToolCallsEvaluator(), AcceptanceCase);
 
         Assert.Equivalent(
             new
@@ -165,7 +165,7 @@ public sealed class DeterministicChecksTests
             .User("and what about order 201?")
             .Answer("Order 201 isn't one of yours, so I can't show it.");
 
-        var metric = await conversation.EvaluateAsync(new StringsEvaluator(), AcceptanceCase);
+        var metric = await conversation.EvaluateAsync(new ExpectedStringsEvaluator(), AcceptanceCase);
 
         Assert.Equivalent(
             new { Name = "Strings", Value = false, Reason = "Contains forbidden: \"201\".", Interpretation = new { Failed = true } },
@@ -176,7 +176,7 @@ public sealed class DeterministicChecksTests
     public async Task StringsMatchWholeTokensSoTheYearDoesNotContainBobsOrder202()
     {
         // The good answer's dates (2026-11-30, 2026-12-30) start with "202".
-        var metric = await AcceptanceAnswer().EvaluateAsync(new StringsEvaluator(), AcceptanceCase);
+        var metric = await AcceptanceAnswer().EvaluateAsync(new ExpectedStringsEvaluator(), AcceptanceCase);
 
         Assert.Equivalent(new { Name = "Strings", Value = true, Interpretation = new { Failed = false } }, metric);
     }
@@ -187,7 +187,7 @@ public sealed class DeterministicChecksTests
         var evalCase = AcceptanceCase with { MustContain = ["2026-11-30", "2026-12-30"] };
 
         var metric = await AcceptanceAnswer("The watch has 30 days, until 2026-11-30; the jacket has 60 days.")
-            .EvaluateAsync(new StringsEvaluator(), evalCase);
+            .EvaluateAsync(new ExpectedStringsEvaluator(), evalCase);
 
         Assert.Equivalent(
             new { Name = "Strings", Value = false, Reason = "Missing: \"2026-12-30\".", Interpretation = new { Failed = true } },
