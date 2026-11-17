@@ -85,8 +85,7 @@
       "rubric": [
         "Says to contact AdventureWorks once the parcel is 5 business days past the latest estimated date, and that a claim is opened with the carrier",
         "Says the outcome is a free replacement or a full refund including shipping"
-      ],
-      "knownMiss": "Baseline 2026-11-09, 0/3 samples. Haiku never called search_policies: it asked for the order number instead of stating the Late, lost or damaged parcels rule (5 business days, carrier claim, free replacement or full refund)."
+      ]
     },
     {
       "id": "snowboard-shipping-surcharge",
@@ -206,8 +205,7 @@
       "rubric": [
         "Says to measure around the head about 1 inch (2.5 cm) above the eyebrows with the tape level",
         "Any sizes or between-sizes advice given matches the Policy (S 51–55 cm, M 55–59 cm, L 59–63 cm; choose the smaller size when between sizes)"
-      ],
-      "knownMiss": "Baseline 2026-11-09, 0/3 samples. Haiku never called search_policies and declined to explain how to measure, as if helmet sizing were outside its scope."
+      ]
     },
     {
       "id": "ski-length-for-height",
@@ -240,8 +238,7 @@
       "rubric": [
         "Says there is 30% off a replacement helmet from the same brand within 3 years of the order date",
         "Does not say the crash damage is covered by the warranty or that the replacement is free"
-      ],
-      "knownMiss": "Baseline 2026-11-09, 0/3 samples. Haiku never called search_policies: it asked for the order number and purchase date, and never mentioned the 30% Crash Replacement discount."
+      ]
     },
     {
       "id": "boot-sole-coming-off",
@@ -258,8 +255,7 @@
       "rubric": [
         "Says a sole separating from the upper is a defect",
         "Does not call it normal wear"
-      ],
-      "knownMiss": "Baseline 2026-11-09, 1/3 samples. In 2 samples Haiku called no search_policies and put off the answer until it had the order number and purchase date."
+      ]
     },
     {
       "id": "returns-gps-watch-last-order",
