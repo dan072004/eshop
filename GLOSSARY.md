@@ -20,6 +20,10 @@ _Avoid_: Concierge, chatbot, AI agent
 The AI service that generates the Shopping Assistant's replies (Ollama, Microsoft Foundry or Claude). Exactly one is chosen, or none, in which case the Shopping Assistant is switched off.
 _Avoid_: Model, backend, "the AI"
 
+**Turn**:
+One Buyer message and the Shopping Assistant's reply to it, however many calls to the Chat Provider and tool uses that reply takes.
+_Avoid_: Request, exchange, round trip
+
 ### Policies
 
 **Policy**:
