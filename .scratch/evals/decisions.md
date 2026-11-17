@@ -111,10 +111,10 @@ The CI workflow draft is in `evals.yml` next to this file.
     - It sends no thinking parameter, so thinking is adaptive, at low effort.
     - Raise the effort only if the calibration set catches a misgrade.
 16. **The gate fails the PR** on any of:
-    - a pass rate below 75% (30/40). It was 90% (36/40) until 2026-11-10, when the maintainer lowered it to the 30/40 baseline for now;
+    - a pass rate below 85% (34/40). It was 90% (36/40) until 2026-11-10, when the maintainer lowered it to the 30/40 baseline (75%); on 2026-11-17 the prompt fixes brought fresh runs to 36 and 38 of 40, and it went up to 85%;
     - any adversarial case failing;
     - any calibration misgrade.
-    - **Known misses** count against the 75%.
+    - **Known misses** count against the 85%.
     - **A first run below 90%** was meant to mean fixing the prompt or tools, not lowering the bar. The baseline came in at 30/40, and the maintainer chose to lower the bar to 75% for now and raise it as the prompt and tools improve. Adversarial cases still need 3 of 3 samples, and judge errors still fail the run.
     - **Configuration:** the threshold is one setting, and ADR 0006 records the baseline.
 
