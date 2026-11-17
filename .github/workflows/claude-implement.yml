@@ -55,7 +55,9 @@ jobs:
             exit 1
           fi
           # `list` prints only ready-for-agent tickets whose every Blocked by ticket is done.
-          if ! node .sandcastle/issues.mjs list | grep -qF "\"id\": \"$TICKET\""; then
+          # Captured first: piped into grep -q, a crash or an early-exit SIGPIPE would be reported as "blocked".
+          ready=$(node .sandcastle/issues.mjs list)
+          if ! grep -qF "\"id\": \"$TICKET\"" <<< "$ready"; then
             echo "::error::.scratch/$TICKET is blocked: a ticket on its Blocked by line isn't done"
             exit 1
           fi
