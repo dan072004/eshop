@@ -1,0 +1,80 @@
+# Claude reviews a same-repo PR once when it's ready for review; a "@claude review" comment asks for another pass.
+# Advisory only: it comments, never approves or requests changes. The instructions are in .github/claude/review.md.
+# See .scratch/claude-github-action/spec.md, "Review triggers" and "Review permissions and tools".
+name: Claude review
+
+on:
+  # Never pull_request_target: PR code must never run with this repository's secrets.
+  pull_request:
+    types: [opened, ready_for_review] # not synchronize: a push to the PR starts no review
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    # A PR from this repository, not a draft and not Dependabot's; or a comment on a PR asking for a review.
+    # The Action itself checks the commenter has write access. A comment's payload has no head repository,
+    # so the first step checks that one.
+    if: >-
+      github.actor != 'dependabot[bot]' && (
+        (github.event_name == 'pull_request' && !github.event.pull_request.draft
+          && github.event.pull_request.head.repo.full_name == github.repository)
+        || (github.event_name == 'issue_comment' && github.event.issue.pull_request
+          && contains(github.event.comment.body, '@claude review')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: claude-action # holds ANTHROPIC_API_KEY
+    # At job level, so a comment that doesn't ask for a review never cancels a review in progress.
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write # the Action exchanges an OIDC token for the Claude GitHub App's token
+    steps:
+      - name: Check the PR is from this repository and not a draft
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.issue.number }}
+        run: |
+          pr=$(gh pr view "$PR" --repo "$REPO" --json isCrossRepository,isDraft --jq '"\(.isCrossRepository) \(.isDraft)"')
+          if [ "${pr% *}" != "false" ]; then
+            echo "::error::Only PRs from this repository are reviewed."
+            exit 1
+          fi
+          if [ "${pr#* }" != "false" ]; then
+            echo "::error::Draft PRs aren't reviewed; mark it ready for review."
+            exit 1
+          fi
+
+      # On a PR event this is the merge commit; on a comment it's the default branch, so Claude reads the PR
+      # through gh pr diff / gh pr view.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }} # this step only
+          allowed_bots: claude[bot] # bots are refused by default; this lets the Action's own PRs be reviewed
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+            Read .github/claude/review.md and follow it to review this pull request.
+          # Read the repo and the PR, post comments; nothing else. allowed_bots stops the Action defaulting to auto mode;
+          # default (Manual) is set anyway, so any call no allow rule covers is denied, and edits are denied outright.
+          # gh pr comment can't edit or delete earlier comments or post a file (--body-file). No git rules: their diff
+          # options include --output, which writes a file, and built-in read-only git commands run without one.
+          # restrict_untrusted_prs stays on: on claude[bot]'s PRs it denies shells and build tools, none of which are here.
+          claude_args: |
+            --model claude-sonnet-5-5
+            --max-turns 30
+            --permission-mode default
+            --allowedTools "Read,Grep,Glob,mcp__github_inline_comment__create_inline_comment,Bash(gh pr view *),Bash(gh pr diff *),Bash(gh pr comment *)"
+            --disallowedTools "Edit,Write,MultiEdit,NotebookEdit,Bash(gh pr comment *--edit-last*),Bash(gh pr comment *--delete-last*),Bash(gh pr comment *--body-file*),Bash(gh pr comment * -F *)"

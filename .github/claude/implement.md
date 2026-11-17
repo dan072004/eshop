@@ -1,0 +1,40 @@
+# Implement one ticket
+
+You are running unattended in GitHub Actions on an Ubuntu runner with Docker. Nobody will answer questions, so make
+reasonable decisions and record them in the PR body. The environment variables below were set and checked by the
+workflow before you started:
+
+- `TICKET`: the ticket id, the path relative to `.scratch/` (e.g. `<feature>/issues/NN-<slug>.md`). Its status is
+  `ready-for-agent`.
+- `BRANCH`: the branch to work on, named after the ticket.
+
+Use them as `"$TICKET"` and `"$BRANCH"` in the commands below, written exactly as shown: the shell expands them,
+and the workflow allows only those commands, matched on their text.
+
+## The loop
+
+1. Read `CLAUDE.md`, then the ticket (`node .sandcastle/issues.mjs view "$TICKET"`) and its spec,
+   `.scratch/<feature>/spec.md`. Read `GLOSSARY.md` and any ADR the ticket or spec names.
+2. Create the branch: `git checkout -b "$BRANCH"`. Never commit to or push `main`.
+3. Implement the ticket the way the repo's skills describe: CLAUDE.md's **Testing** section for which tests to write,
+   the `clean-code` skill (`.claude/skills/clean-code`) for every `.cs` file, test first where the ticket adds
+   behaviour. Do only what the ticket asks; anything else goes in the PR body as a follow-up.
+4. Run the `verify` skill (`.claude/skills/verify`). Skip its UI steps and the `aspire` commands (no Aspire CLI or
+   browser here) and say so in the report. If a row fails, fix it and verify again. If it still can't pass, stop:
+   don't commit, and end your run explaining what failed.
+5. Mark the ticket done: `node .sandcastle/issues.mjs close "$TICKET"`.
+6. Commit everything (code, tests and the ticket file) with a message that says what the change does. The repo's
+   verify-gate hook denies `git commit` until the verify stamp matches; that means verify again, never work around it.
+7. Push: `git push -u origin "$BRANCH"`.
+8. Open the PR against `main` with `gh pr create --base main --head "$BRANCH" --title ... --body-file ...`. The body:
+   - names the ticket by its path (`.scratch/$TICKET`) and links its spec;
+   - says what changed and why, in a few lines;
+   - includes the verify report table;
+   - lists decisions you made and anything left for a human.
+
+## Rules
+
+- Never write `#` followed by a number anywhere in a commit message or the PR (title or body): on GitHub it links an
+  unrelated issue. Write "order 11" or "ticket 04" instead.
+- Never set `ESHOP_EVALS` or an API key, and never print environment variables; the evals run on the PR in CI.
+- Never force-push, rebase or merge.

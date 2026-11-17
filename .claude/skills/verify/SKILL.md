@@ -95,7 +95,7 @@ End with one line: **Verified** or **Not verified: \<what's left\>**. Never roun
 If no row is FAIL, record the stamp so the commit gate lets the changes through:
 
 ```bash
-powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/verify-gate.ps1 -Stamp
+pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/verify-gate.ps1 -Stamp
 ```
 
 Staging files doesn't affect the stamp, but editing any code file after it does, so verify again before committing.

@@ -1,0 +1,89 @@
+# A manual run that has Claude implement one ready-for-agent ticket from .scratch/ and open a PR.
+# See .scratch/claude-github-action/spec.md, "Implement trigger", "Input validation before any model call" and
+# "Implement job". Claude's instructions are in .github/claude/implement.md.
+name: Claude implement
+
+on:
+  workflow_dispatch:
+    inputs:
+      ticket:
+        description: Ticket id as the issue tracker writes it, e.g. assistant-resilience/issues/01-<slug>.md
+        type: string
+        required: true
+
+concurrency:
+  group: claude-implement-${{ inputs.ticket }} # one run per ticket; a second run waits rather than racing the first
+  cancel-in-progress: false
+
+# Dispatching needs write access to the repository, so no fork or Dependabot guard is needed here.
+permissions:
+  contents: read
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45 # a run that hits this, or the turn limit, ends without a PR
+    environment: claude-action # holds ANTHROPIC_API_KEY: its own Console workspace with a spend limit
+    # contents and pull-requests for the job token; id-token so the Action can exchange OIDC for the Claude GitHub
+    # App's token, which does the pushing and the PR (no github_token input, so the PR starts other workflows).
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # Before any model call, and before installing anything. The id comes in through env, never ${{ }} in the
+      # script, so it can't inject shell. The pattern has no dots or leading slash, so it can't leave .scratch/.
+      - name: Check the ticket
+        id: ticket
+        env:
+          TICKET: ${{ inputs.ticket }}
+        run: |
+          if ! [[ "$TICKET" =~ ^[a-z0-9-]+/issues/[0-9]{2}-[a-z0-9-]+\.md$ ]]; then
+            echo "::error::'$TICKET' is not a ticket id: expected <feature>/issues/NN-<slug>.md"
+            exit 1
+          fi
+          if [ ! -f ".scratch/$TICKET" ]; then
+            echo "::error::No ticket at .scratch/$TICKET"
+            exit 1
+          fi
+          # The same line .sandcastle/issues.mjs reads: the first **Status:** line.
+          status=$(grep -m1 -E '^\*\*Status:\*\*' ".scratch/$TICKET" | sed -E 's/^\*\*Status:\*\*[[:space:]]*//; s/[[:space:]]*$//' || true)
+          if [ "$status" != "ready-for-agent" ]; then
+            echo "::error::.scratch/$TICKET has status '${status:-none}', not ready-for-agent"
+            exit 1
+          fi
+          # claude/<feature>-NN-<slug>, e.g. claude/assistant-resilience-01-shopping-assistant-survives-...
+          branch="claude/${TICKET%.md}"
+          echo "branch=${branch/\/issues\//-}" >> "$GITHUB_OUTPUT"
+          echo "Ticket .scratch/$TICKET is ready-for-agent."
+
+      - name: Setup .NET (global.json)
+        uses: actions/setup-dotnet@v4
+
+      - name: Restore the server solution
+        run: dotnet restore eShop.Web.slnf
+
+      # The repo's .claude/settings.json loads here, so the verify-gate hook (pwsh, on the runner) gates Claude's
+      # commits as it does locally. The Action defaults this run to auto mode; the acceptEdits below comes after it and
+      # wins: workspace edits and built-in read-only commands run, any other call no allow rule covers is denied.
+      # Rules match the command as Claude writes it. Single quotes keep "$BRANCH" and "$TICKET" literal here, and the
+      # shell expands them to the values checked above, so only that branch is created and pushed.
+      # dotnet build/test run code Claude wrote: this narrows the commands, it isn't a sandbox.
+      # Skill lets Claude load the verify and clean-code skills that implement.md names.
+      - name: Implement the ticket
+        uses: anthropics/claude-code-action@v1
+        env:
+          TICKET: ${{ inputs.ticket }} # checked above; Claude reads it from the environment
+          BRANCH: ${{ steps.ticket.outputs.branch }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }} # this step only
+          prompt: |
+            Follow the instructions in .github/claude/implement.md for the ticket in the TICKET environment variable,
+            on the branch in the BRANCH environment variable.
+          claude_args: |
+            --model claude-opus-5-5
+            --max-turns 80
+            --permission-mode acceptEdits
+            --allowedTools 'Read,Edit,Write,Glob,Grep,Skill,Bash(git checkout -b "$BRANCH"),Bash(git status *),Bash(git diff *),Bash(git log *),Bash(git add *),Bash(git commit *),Bash(git push -u origin "$BRANCH"),Bash(dotnet restore *),Bash(dotnet build *),Bash(dotnet test *),Bash(dotnet format *),Bash(node .sandcastle/issues.mjs view "$TICKET"),Bash(node .sandcastle/issues.mjs close "$TICKET"),Bash(gh pr create --base main --head "$BRANCH" *),Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/verify-gate.ps1 -Stamp)'
