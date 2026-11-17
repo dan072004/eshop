@@ -42,7 +42,7 @@ public class ShoppingAssistantTests
         var chat = CreateChat(new RecordingChatClient());
 
         var prompt = chat.Messages.Single(message => message.Role == ChatRole.System).Text;
-        Assert.Contains("cite each rule with its citation value", prompt);
+        Assert.Contains("cite each rule with its full citation value, word for word", prompt);
     }
 
     private static ChatState CreateChat(IChatClient chatClient)

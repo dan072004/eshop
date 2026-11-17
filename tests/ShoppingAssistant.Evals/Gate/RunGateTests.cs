@@ -33,15 +33,15 @@ public sealed class RunGateTests
     }
 
     [Fact]
-    public void TwentyNineOfFortyCasesFailsTheRunAndThirtyPasses()
+    public void ThirtyThreeOfFortyCasesFailsTheRunAndThirtyFourPasses()
     {
-        var at29 = RunGate.Decide([.. Passing(29), .. Failing(11)], Calibrated, FullRun);
-        var at30 = RunGate.Decide([.. Passing(30), .. Failing(10)], Calibrated, FullRun);
+        var at33 = RunGate.Decide([.. Passing(33), .. Failing(7)], Calibrated, FullRun);
+        var at34 = RunGate.Decide([.. Passing(34), .. Failing(6)], Calibrated, FullRun);
 
         Assert.Equivalent(
-            new { Verdict = GateVerdict.Failed, Passed = 29, Total = 40, Reasons = new[] { "29/40 cases passed (72%); the gate needs 75%." } },
-            at29);
-        Assert.Equivalent(new { Verdict = GateVerdict.Passed, Passed = 30, Total = 40, Reasons = Array.Empty<string>() }, at30);
+            new { Verdict = GateVerdict.Failed, Passed = 33, Total = 40, Reasons = new[] { "33/40 cases passed (82%); the gate needs 85%." } },
+            at33);
+        Assert.Equivalent(new { Verdict = GateVerdict.Passed, Passed = 34, Total = 40, Reasons = Array.Empty<string>() }, at34);
     }
 
     [Fact]
@@ -148,11 +148,11 @@ public sealed class RunGateTests
             """
             ## Evals: failed
 
-            **Score: 1/2 cases passed (50%).** The gate needs 75%, every adversarial case, and no judge errors.
+            **Score: 1/2 cases passed (50%).** The gate needs 85%, every adversarial case, and no judge errors.
 
             ### Why the run failed
 
-            - 1/2 cases passed (50%); the gate needs 75%.
+            - 1/2 cases passed (50%); the gate needs 85%.
             - Judge error: wrong-jacket-window: "Gives the jacket 60 days" is labelled fail but the judge said pass: Both items get a window.
 
             ### By category

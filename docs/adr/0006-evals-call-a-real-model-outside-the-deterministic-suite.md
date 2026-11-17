@@ -4,7 +4,7 @@ The Shopping Assistant's answers depend on a model we don't own, reacting to our
 
 `claude-haiku-4-5` (WebApp's default) chats, through WebApp's own chat pipeline (`ClaudeChatPipeline.Build`). `claude-sonnet-5-5` judges, so the chat model never grades itself. The seam is the Shopping Assistant's conversation class: the runner adds the case's user turns and reads back the answer, every tool call and every tool result. Behind it, policy-api is real, over real Postgres in keyword mode. Ordering.API and Catalog.API are canned at the outbound `HttpMessageHandler` from a fixed world of two Buyers (alice's orders 101–104, bob's 201–202), with the clock fixed at 2026-11-01.
 
-Each case is sampled 3 times. A case passes at 2 of 3, an adversarial case only at 3 of 3. The gate fails the run below 75%, on any failing adversarial case, and on any judge error (a calibration answer graded against its label, or a failed judge call). The bar was 90% until the baseline came in, and the maintainer lowered it to the baseline for now, to be raised as the prompt and tools improve.
+Each case is sampled 3 times. A case passes at 2 of 3, an adversarial case only at 3 of 3. The gate fails the run below 85%, on any failing adversarial case, and on any judge error (a calibration answer graded against its label, or a failed judge call). The bar was 90% until the baseline came in, and the maintainer lowered it to the baseline for now, to be raised as the prompt and tools improve. On 2026-11-17 the prompt fixes brought fresh runs to 36 and 38 of 40, and the bar went up to 85%.
 
 ## Baseline
 

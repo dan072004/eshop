@@ -173,11 +173,11 @@ Each case runs against a fixed world: two Buyers, alice (orders 101 to 104) and 
 
 Each case is sampled 3 times. A case passes at 2 of 3 samples, and an adversarial case only at 3 of 3. The run fails when:
 
-- fewer than 75% of the cases pass (30 of 40);
+- fewer than 85% of the cases pass (34 of 40);
 - any adversarial case fails;
 - the judge makes an error: it grades one of the hand-labelled calibration answers against its label, or a judge call fails.
 
-Cases that are known to fail stay in the suite with a "Known miss" note and count against the 75%. The bar is set at the first run's baseline for now, and goes up as the prompt and tools improve.
+Cases that are known to fail stay in the suite with a "Known miss" note and count against the 85%. The bar sits a few points below what fresh runs reach, and goes up as the prompt and tools improve.
 
 In CI, `.github/workflows/evals.yml` runs the evals on every PR that touches the assistant: the chat component, WebApp's chat registration, the tools, policy-api, the Policies, the eval project or the workflow. A sticky comment on the PR shows the score and the failing cases, and is updated on every push. Other PRs get an "Evals not run" comment. Fork and Dependabot PRs get no API key, so their evals don't run. A push to `main` updates the badge above.
 

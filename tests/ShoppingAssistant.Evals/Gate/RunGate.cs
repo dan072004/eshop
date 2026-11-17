@@ -88,7 +88,7 @@ public sealed record CaseResult(string Id, CaseCategory Category, IReadOnlyList<
 
 /// <param name="PassThresholdPercent">The share of cases that must pass; known misses count against it.</param>
 /// <param name="Filtered">Only some cases ran (<c>ESHOP_EVALS_CASE</c>), so the gate is skipped.</param>
-public sealed record GateSettings(int PassThresholdPercent = 75, bool Filtered = false);
+public sealed record GateSettings(int PassThresholdPercent = 85, bool Filtered = false);
 
 public enum GateVerdict
 {
