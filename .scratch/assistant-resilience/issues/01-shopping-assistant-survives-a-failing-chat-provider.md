@@ -12,7 +12,7 @@ See the spec, `.scratch/assistant-resilience/spec.md`, for the decisions and the
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] The Claude client times out each attempt after 30 seconds and retries at most 2 times, using the SDK's built-in retries. No extra retry layer is added.
 - [ ] The Claude chat pipeline cancels a whole turn after 60 seconds. The turn covers every model request and every tool call. The deadline is an optional build parameter that defaults to 60 seconds. It is not a configuration setting, and the evals run under it.

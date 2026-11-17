@@ -15,6 +15,10 @@ using Microsoft.IdentityModel.JsonWebTokens;
 
 public static class Extensions
 {
+    // Two 30-second attempts fit the Claude pipeline's 60-second turn deadline, which cuts a third one short.
+    private const int ClaudeMaxRetries = 2;
+    private static readonly TimeSpan ClaudeAttemptTimeout = TimeSpan.FromSeconds(30);
+
     public static void AddApplicationServices(this IHostApplicationBuilder builder)
     {
         builder.AddAuthenticationServices();
@@ -184,7 +188,10 @@ public static class Extensions
 
         // Reading the settings here also makes an invalid Claude:MaxOutputTokens fail at startup.
         var configuration = builder.Configuration;
-        var anthropic = new AnthropicClient(new ClientOptions { ApiKey = apiKey })
+        // The SDK's own retries cover connection errors, timeouts, 408, 409, 429 and 5xx and honour retry-after; no
+        // resilience handler is layered on top, because two retry layers would multiply the attempts.
+        var clientOptions = new ClientOptions { ApiKey = apiKey, Timeout = ClaudeAttemptTimeout, MaxRetries = ClaudeMaxRetries };
+        var anthropic = new AnthropicClient(clientOptions)
             .AsIChatClient(ClaudeChatPipeline.GetModelId(configuration), ClaudeChatPipeline.GetMaxOutputTokens(configuration));
 
         builder.Services.AddChatClient(services => ClaudeChatPipeline.Build(anthropic, configuration, services));

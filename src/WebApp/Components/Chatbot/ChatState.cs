@@ -9,6 +9,9 @@ namespace eShop.WebApp.Chatbot;
 
 public class ChatState
 {
+    private const string UnavailableText = "The Shopping Assistant isn't available right now. Please try again in a moment.";
+    private const string FailedTurnLogMessage = "Error getting chat completions.";
+
     private readonly ICatalogService _catalogService;
     private readonly IBasketState _basketState;
     private readonly ClaimsPrincipal _user;
@@ -76,13 +79,24 @@ public class ChatState
 
     public IList<ChatMessage> Messages { get; }
 
+    /// <summary>
+    /// The system's notice that the last turn failed, shown to the Buyer but never sent to the model; empty when there
+    /// isn't one.
+    /// </summary>
+    public string UnavailableNotice { get; private set; } = "";
+
     public async Task AddUserMessageAsync(string userText, Action onMessageAdded)
     {
-        // Store the user's message
+        UnavailableNotice = "";
         Messages.Add(new ChatMessage(ChatRole.User, userText));
         onMessageAdded();
 
-        // Get and store the AI's response message
+        await AddReplyAsync();
+        onMessageAdded();
+    }
+
+    private async Task AddReplyAsync()
+    {
         try
         {
             var response = await _chatClient.GetResponseAsync(Messages, _chatOptions);
@@ -93,15 +107,17 @@ public class ChatState
         }
         catch (Exception e)
         {
-            if (_logger.IsEnabled(LogLevel.Error))
-            {
-                _logger.LogError(e, "Error getting chat completions.");
-            }
-            Messages.Add(new ChatMessage(ChatRole.Assistant, $"My apologies, but I encountered an unexpected error."));
+            // Never retry the turn: running it again would repeat its tools, such as adding to the basket.
+            LogFailedTurn(e);
+            UnavailableNotice = UnavailableText;
         }
-        onMessageAdded();
     }
 
+    private void LogFailedTurn(Exception e)
+    {
+        var level = e is OperationCanceledException or TimeoutException ? LogLevel.Warning : LogLevel.Error;
+        _logger.Log(level, e, FailedTurnLogMessage);
+    }
 
     [Description("Gets information about the chat user")]
     private string GetUserInfo()
