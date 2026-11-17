@@ -16,9 +16,14 @@ and the workflow allows only those commands, matched on their text.
 1. Read `CLAUDE.md`, then the ticket (`node .sandcastle/issues.mjs view "$TICKET"`) and its spec,
    `.scratch/<feature>/spec.md`. Read `GLOSSARY.md` and any ADR the ticket or spec names.
 2. Create the branch: `git checkout -b "$BRANCH"`. Never commit to or push `main`.
-3. Implement the ticket the way the repo's skills describe: CLAUDE.md's **Testing** section for which tests to write,
-   the `clean-code` skill (`.claude/skills/clean-code`) for every `.cs` file, test first where the ticket adds
-   behaviour. Do only what the ticket asks; anything else goes in the PR body as a follow-up.
+3. Implement the ticket the way the repo's skills describe: the `tdd` skill (`.claude/skills/tdd`) for the
+   red → green loop where the ticket adds behaviour, CLAUDE.md's **Testing** section for which seam each test uses,
+   and the `clean-code` skill (`.claude/skills/clean-code`) for every `.cs` file. Two `tdd` steps change here:
+   - Nobody can confirm the seams, so take them from the ticket, the spec and CLAUDE.md's Testing table, and list
+     them in the PR body.
+   - The `codebase-design` and `code-review` skills it mentions aren't installed; the review runs on the PR instead.
+
+   Do only what the ticket asks; anything else goes in the PR body as a follow-up.
 4. Run the `verify` skill (`.claude/skills/verify`). Skip its UI steps and the `aspire` commands (no Aspire CLI or
    browser here) and say so in the report. If a row fails, fix it and verify again. If it still can't pass, stop:
    don't commit, and end your run explaining what failed.

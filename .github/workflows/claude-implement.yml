@@ -54,6 +54,13 @@ jobs:
             echo "::error::.scratch/$TICKET has status '${status:-none}', not ready-for-agent"
             exit 1
           fi
+          # `list` prints only ready-for-agent tickets whose every Blocked by ticket is done.
+          # Captured first: piped into grep -q, a crash or an early-exit SIGPIPE would be reported as "blocked".
+          ready=$(node .sandcastle/issues.mjs list)
+          if ! grep -qF "\"id\": \"$TICKET\"" <<< "$ready"; then
+            echo "::error::.scratch/$TICKET is blocked: a ticket on its Blocked by line isn't done"
+            exit 1
+          fi
           # claude/<feature>-NN-<slug>, e.g. claude/assistant-resilience-01-shopping-assistant-survives-...
           branch="claude/${TICKET%.md}"
           echo "branch=${branch/\/issues\//-}" >> "$GITHUB_OUTPUT"
