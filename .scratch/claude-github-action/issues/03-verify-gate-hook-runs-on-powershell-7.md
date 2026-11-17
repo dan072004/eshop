@@ -6,7 +6,7 @@ See the spec's "The verify-gate hook runs on `pwsh`".
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] On the developer's Windows machine, a `git commit` with unverified code changes is still denied
 - [ ] After a passing verify, the same commit is allowed
