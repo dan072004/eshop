@@ -14,8 +14,12 @@ See the spec's "Credentials".
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-human
+**Status:** done
 
-- [ ] The Action's key exists only in the `claude-action` environment: not as a repository secret, and not in the `evals` environment
-- [ ] The Action's workspace has a $10 spend limit
-- [ ] The Claude GitHub App is installed on `dan072004/eshop` and on no other repository
+- [x] The Action's key exists only in the `claude-action` environment: not as a repository secret, and not in the `evals` environment
+- [x] The Action's workspace has a $10 spend limit
+- [x] The Claude GitHub App is installed on `dan072004/eshop` and on no other repository
+
+## Comments
+
+- 2026-11-17, checked with `gh`: `claude-action` exists with no required reviewers and holds `ANTHROPIC_API_KEY` (set 2026-11-17); there are no repository secrets; the `evals` environment's key is unchanged (set 2026-11-10). The spend limit and the app installation can't be seen from `gh`; the maintainer confirmed them.
