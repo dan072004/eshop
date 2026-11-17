@@ -36,15 +36,20 @@ jobs:
       pull-requests: write
       id-token: write # the Action exchanges an OIDC token for the Claude GitHub App's token
     steps:
-      - name: Check the PR is from this repository
+      - name: Check the PR is from this repository and not a draft
         if: github.event_name == 'issue_comment'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.issue.number }}
         run: |
-          if [ "$(gh pr view "$PR" --repo "$REPO" --json isCrossRepository --jq .isCrossRepository)" != "false" ]; then
+          pr=$(gh pr view "$PR" --repo "$REPO" --json isCrossRepository,isDraft --jq '"\(.isCrossRepository) \(.isDraft)"')
+          if [ "${pr% *}" != "false" ]; then
             echo "::error::Only PRs from this repository are reviewed."
+            exit 1
+          fi
+          if [ "${pr#* }" != "false" ]; then
+            echo "::error::Draft PRs aren't reviewed; mark it ready for review."
             exit 1
           fi
 
@@ -62,10 +67,14 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
             Read .github/claude/review.md and follow it to review this pull request.
-          # Read the repo and the PR, post comments; nothing else. Edits are denied outright because the
-          # auto permission mode would otherwise allow them.
+          # Read the repo and the PR, post comments; nothing else. allowed_bots stops the Action defaulting to auto mode;
+          # default (Manual) is set anyway, so any call no allow rule covers is denied, and edits are denied outright.
+          # gh pr comment can't edit or delete earlier comments or post a file (--body-file). No git rules: their diff
+          # options include --output, which writes a file, and built-in read-only git commands run without one.
+          # restrict_untrusted_prs stays on: on claude[bot]'s PRs it denies shells and build tools, none of which are here.
           claude_args: |
             --model claude-sonnet-5-5
             --max-turns 30
-            --allowedTools "Read,Grep,Glob,mcp__github_inline_comment__create_inline_comment,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(git log:*),Bash(git show:*),Bash(git diff:*)"
-            --disallowedTools "Edit,Write,MultiEdit,NotebookEdit"
+            --permission-mode default
+            --allowedTools "Read,Grep,Glob,mcp__github_inline_comment__create_inline_comment,Bash(gh pr view *),Bash(gh pr diff *),Bash(gh pr comment *)"
+            --disallowedTools "Edit,Write,MultiEdit,NotebookEdit,Bash(gh pr comment *--edit-last*),Bash(gh pr comment *--delete-last*),Bash(gh pr comment *--body-file*),Bash(gh pr comment * -F *)"

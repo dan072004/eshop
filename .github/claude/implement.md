@@ -8,7 +8,8 @@ workflow before you started:
   `ready-for-agent`.
 - `BRANCH`: the branch to work on, named after the ticket.
 
-Use them as `"$TICKET"` and `"$BRANCH"` in the commands below; the shell expands them.
+Use them as `"$TICKET"` and `"$BRANCH"` in the commands below, written exactly as shown: the shell expands them,
+and the workflow allows only those commands, matched on their text.
 
 ## The loop
 
