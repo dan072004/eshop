@@ -71,7 +71,7 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, Cach
         {
             await chat.AddUserMessageAsync(turn, () => { });
 
-            // The conversation class turns a failed model call into an apology; that is not the model's answer.
+            // The conversation class turns a failed model call into an unavailable notice; that is not the model's answer.
             if (errors.First is { } error)
             {
                 throw new ModelCallFailedException(evalCase.Id, error);
@@ -105,11 +105,12 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, Cach
         public void Dispose() { }
     }
 
-    // Records the exception the conversation class logs when a model call fails.
+    // Records the exception the conversation class logs when a model call fails: a warning for a timeout, an error otherwise.
     private sealed class ChatErrorLoggerProvider : ILoggerProvider
     {
         // What the conversation class logs when a model call fails.
         private const string ChatError = "Error getting chat completions.";
+        private const LogLevel FailedTurnLevel = LogLevel.Warning;
 
         public Exception? First { get; private set; }
 
@@ -122,11 +123,11 @@ public sealed class CaseRunner(EvalWorld world, PolicyApiFixture policyApi, Cach
         {
             public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
-            public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Error;
+            public bool IsEnabled(LogLevel logLevel) => logLevel >= FailedTurnLevel;
 
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
             {
-                if (logLevel >= LogLevel.Error && exception is not null && formatter(state, exception) == ChatError)
+                if (logLevel >= FailedTurnLevel && exception is not null && formatter(state, exception) == ChatError)
                 {
                     errors.First ??= exception;
                 }

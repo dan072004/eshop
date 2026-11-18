@@ -11,21 +11,28 @@ public static class ClaudeChatPipeline
 {
     private const string DefaultModelId = "claude-haiku-4-5";
     private const int DefaultMaxOutputTokens = 1024;
+    private static readonly TimeSpan DefaultTurnDeadline = TimeSpan.FromSeconds(60);
 
     /// <summary>
-    /// Wraps <paramref name="inner"/> with function invocation and request defaults: the model id and output limit
-    /// (<c>claude-haiku-4-5</c> and 1024, overridable under <c>Claude:ModelId</c> and <c>Claude:MaxOutputTokens</c>)
-    /// and thinking disabled. Options a caller sets take precedence.
+    /// Wraps <paramref name="inner"/> with a turn deadline, function invocation and request defaults: the model id and
+    /// output limit (<c>claude-haiku-4-5</c> and 1024, overridable under <c>Claude:ModelId</c> and
+    /// <c>Claude:MaxOutputTokens</c>) and thinking disabled. Options a caller sets take precedence.
     /// </summary>
     /// <param name="services">Resolves the logger for function invocation; optional outside dependency injection.</param>
+    /// <param name="turnDeadline">
+    /// How long a whole turn, every model request and tool call, may take before it is cancelled; 60 seconds by default.
+    /// </param>
     /// <exception cref="InvalidOperationException"><c>Claude:MaxOutputTokens</c> is not a positive whole number.</exception>
-    public static IChatClient Build(IChatClient inner, IConfiguration configuration, IServiceProvider? services = null)
+    public static IChatClient Build(
+        IChatClient inner, IConfiguration configuration, IServiceProvider? services = null, TimeSpan? turnDeadline = null)
     {
         var modelId = GetModelId(configuration);
         var maxOutputTokens = GetMaxOutputTokens(configuration);
+        var deadline = turnDeadline ?? DefaultTurnDeadline;
 
         // The Anthropic adapter has no "off" thinking mode; ReasoningEffort.None is what makes it send thinking.type=disabled.
         return new ChatClientBuilder(inner)
+            .Use(turn => new TurnDeadlineChatClient(turn, deadline))
             .ConfigureOptions(options =>
             {
                 options.ModelId ??= modelId;
