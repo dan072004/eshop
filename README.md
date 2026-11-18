@@ -2,6 +2,35 @@
 
 A reference .NET application implementing an e-commerce website using a services-based architecture with [Aspire](https://aspire.dev/).
 
+## What I added
+
+This is a fork of Microsoft's [dotnet/eShop](https://github.com/dotnet/eShop). I added an AI layer: a Shopping Assistant that answers from the store's Policies and the Buyer's own orders, a C# MCP server with the same tools, and evals that gate CI. eShop's architecture stays as it was: the assistant calls the existing APIs, and Ordering.API still decides which orders a Buyer may see.
+
+[![Shopping Assistant evals](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdan072004%2Feshop%2Fbadges%2Fevals.json)](https://github.com/dan072004/eshop/actions/workflows/evals.yml)
+
+| eShop already had | What I added | PR |
+| --- | --- | --- |
+| A chatbot on Microsoft Foundry or Ollama | Claude as a third Chat Provider behind `IChatClient`, picked by one AppHost setting | [6](https://github.com/dan072004/eshop/pull/6), [7](https://github.com/dan072004/eshop/pull/7) |
+| Catalog and basket tools | 15 Policies in a new policy service (pgvector), and read-only order tools. Every Policy rule the assistant states carries a Citation | [9](https://github.com/dan072004/eshop/pull/9) |
+| No MCP | `eShop.Mcp`: the same tools for Claude Code and VS Code. The Buyer signs in through Identity.API (OAuth), and a token exchange is the only way into Ordering | [10](https://github.com/dan072004/eshop/pull/10) |
+| No evals | 40 cases on a real Claude model, deterministic checks plus an LLM judge, and a gate that fails the PR | [15](https://github.com/dan072004/eshop/pull/15), [16](https://github.com/dan072004/eshop/pull/16) |
+| No fallback when the model fails | Timeouts, retries, and a plain notice to the Buyer | [20](https://github.com/dan072004/eshop/pull/20) |
+| Mock-heavy tests | Tests at real seams (Postgres, Redis, HTTP), written down as the repo's convention | [4](https://github.com/dan072004/eshop/pull/4) |
+| No CI agent | Claude reviews every PR and can implement a ticket end to end | [17](https://github.com/dan072004/eshop/pull/17), [28](https://github.com/dan072004/eshop/pull/28) |
+
+**How it was built.** Spec-driven, with Claude Code and [Matt Pocock's skills](https://github.com/mattpocock/skills). Each feature followed the same loop:
+
+1. **Grill:** Claude questioned me about the idea until every decision was made. The decisions became [ADRs](docs/adr) and [GLOSSARY](GLOSSARY.md) terms.
+2. **Spec and tickets:** Claude wrote the spec and split it into tickets (`.scratch/`). I reviewed and corrected both.
+3. **Implement:** Claude implemented one ticket at a time, test-first, behind a verify gate that blocks commits until the build and the matching tests pass.
+4. **Review:** a code review against the repo's standards and the spec, then mine, before every merge.
+
+I made the decisions, set the guardrails (`CLAUDE.md`, the testing convention, hooks) and reviewed every change; Claude wrote the specs, tickets and code. The [correction log](docs/correction-log.md) lists where the agents went wrong and how each mistake was caught.
+
+---
+
+*The original eShop README follows.*
+
 ![eShop Reference Application architecture diagram](img/eshop_architecture.png)
 
 ![eShop homepage screenshot](img/eshop_homepage.png)
