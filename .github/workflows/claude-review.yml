@@ -26,7 +26,7 @@ jobs:
           && contains(github.event.comment.body, '@claude review')))
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: claude-action # holds ANTHROPIC_API_KEY
+    environment: claude-action # holds CLAUDE_CODE_OAUTH_TOKEN
     # At job level, so a comment that doesn't ask for a review never cancels a review in progress.
     concurrency:
       group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}
@@ -61,7 +61,7 @@ jobs:
 
       - uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }} # this step only
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }} # this step only; from `claude setup-token`, uses the Claude subscription
           allowed_bots: claude[bot] # bots are refused by default; this lets the Action's own PRs be reviewed
           prompt: |
             REPO: ${{ github.repository }}

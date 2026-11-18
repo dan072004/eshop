@@ -31,7 +31,9 @@ and the workflow allows only those commands, matched on their text.
 6. Commit everything (code, tests and the ticket file) with a message that says what the change does. The repo's
    verify-gate hook denies `git commit` until the verify stamp matches; that means verify again, never work around it.
 7. Push: `git push -u origin "$BRANCH"`.
-8. Open the PR against `main` with `gh pr create --base main --head "$BRANCH" --title ... --body-file ...`. The body:
+8. Write the PR body to `artifacts/pr-body.md` (inside the repo and git-ignored; a file outside the repo is refused),
+   then open the PR against `main` with
+   `gh pr create --base main --head "$BRANCH" --title "..." --body-file artifacts/pr-body.md`. The body:
    - names the ticket by its path (`.scratch/$TICKET`) and links its spec;
    - says what changed and why, in a few lines;
    - includes the verify report table;
