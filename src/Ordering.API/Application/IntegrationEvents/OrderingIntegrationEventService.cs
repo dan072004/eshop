@@ -1,4 +1,6 @@
-﻿namespace eShop.Ordering.API.Application.IntegrationEvents;
+﻿using eShop.IntegrationEventLogEF;
+
+namespace eShop.Ordering.API.Application.IntegrationEvents;
 
 public class OrderingIntegrationEventService(IEventBus eventBus,
     OrderingContext orderingContext,
@@ -16,19 +18,13 @@ public class OrderingIntegrationEventService(IEventBus eventBus,
 
         foreach (var logEvt in pendingLogEvents)
         {
-            _logger.LogInformation("Publishing integration event: {IntegrationEventId} - ({@IntegrationEvent})", logEvt.EventId, logEvt.IntegrationEvent);
-
-            try
+            if (logEvt.IntegrationEvent is null)
             {
-                await _eventLogService.MarkEventAsInProgressAsync(logEvt.EventId);
-                await _eventBus.PublishAsync(logEvt.IntegrationEvent);
-                await _eventLogService.MarkEventAsPublishedAsync(logEvt.EventId);
+                await SkipUnresolvableEventAsync(logEvt);
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogError(ex, "Error publishing integration event: {IntegrationEventId}", logEvt.EventId);
-
-                await _eventLogService.MarkEventAsFailedAsync(logEvt.EventId);
+                await PublishAsync(logEvt);
             }
         }
     }
@@ -38,5 +34,31 @@ public class OrderingIntegrationEventService(IEventBus eventBus,
         _logger.LogInformation("Enqueuing integration event {IntegrationEventId} to repository ({@IntegrationEvent})", evt.Id, evt);
 
         await _eventLogService.SaveEventAsync(evt, _orderingContext.GetCurrentTransaction());
+    }
+
+    private async Task SkipUnresolvableEventAsync(IntegrationEventLogEntry logEvt)
+    {
+        _logger.LogError("Integration event {IntegrationEventId} was not published: its type {EventTypeName} matches no loaded integration event type",
+            logEvt.EventId, logEvt.EventTypeName);
+
+        await _eventLogService.MarkEventAsFailedAsync(logEvt.EventId);
+    }
+
+    private async Task PublishAsync(IntegrationEventLogEntry logEvt)
+    {
+        _logger.LogInformation("Publishing integration event: {IntegrationEventId} - ({@IntegrationEvent})", logEvt.EventId, logEvt.IntegrationEvent);
+
+        try
+        {
+            await _eventLogService.MarkEventAsInProgressAsync(logEvt.EventId);
+            await _eventBus.PublishAsync(logEvt.IntegrationEvent);
+            await _eventLogService.MarkEventAsPublishedAsync(logEvt.EventId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error publishing integration event: {IntegrationEventId}", logEvt.EventId);
+
+            await _eventLogService.MarkEventAsFailedAsync(logEvt.EventId);
+        }
     }
 }

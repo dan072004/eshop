@@ -8,34 +8,51 @@ public class IntegrationEventLogService<TContext> : IIntegrationEventLogService,
     private volatile bool _disposedValue;
     private readonly TContext _context;
 
+    // Only successful lookups are cached, so a type name that resolves to nothing is looked up again next time.
+    private static readonly ConcurrentDictionary<string, Type> s_eventTypes = new();
+
     public IntegrationEventLogService(TContext context)
     {
         _context = context;
     }
 
-    // Resolves by full name across loaded assemblies rather than the entry assembly, which is
-    // the test host (not the service) when running under WebApplicationFactory.
-    private static readonly ConcurrentDictionary<string, Type> s_eventTypes = new();
-
-    private static Type ResolveEventType(string eventTypeName) =>
-        s_eventTypes.GetOrAdd(eventTypeName, name => AppDomain.CurrentDomain.GetAssemblies()
-            .Select(assembly => assembly.GetType(name))
-            .FirstOrDefault(type => type is not null && typeof(IntegrationEvent).IsAssignableFrom(type)));
-
     public async Task<IEnumerable<IntegrationEventLogEntry>> RetrieveEventLogsPendingToPublishAsync(Guid transactionId)
     {
-        var result = await _context.Set<IntegrationEventLogEntry>()
+        var pendingEntries = await _context.Set<IntegrationEventLogEntry>()
             .Where(e => e.TransactionId == transactionId && e.State == EventStateEnum.NotPublished)
             .ToListAsync();
 
-        if (result.Count != 0)
+        // Deserialized eagerly, so nothing throws while the caller enumerates the entries.
+        return pendingEntries
+            .OrderBy(e => e.CreationTime)
+            .Select(DeserializeIfTypeResolves)
+            .ToList();
+    }
+
+    private static IntegrationEventLogEntry DeserializeIfTypeResolves(IntegrationEventLogEntry entry) =>
+        ResolveEventType(entry.EventTypeName) is { } eventType ? entry.DeserializeJsonContent(eventType) : entry;
+
+    private static Type ResolveEventType(string eventTypeName)
+    {
+        if (s_eventTypes.TryGetValue(eventTypeName, out var cachedType))
         {
-            return result.OrderBy(o => o.CreationTime)
-                .Select(e => e.DeserializeJsonContent(ResolveEventType(e.EventTypeName)));
+            return cachedType;
         }
 
-        return [];
+        var eventType = FindLoadedEventType(eventTypeName);
+        if (eventType is not null)
+        {
+            s_eventTypes.TryAdd(eventTypeName, eventType);
+        }
+        return eventType;
     }
+
+    // Searches every loaded assembly rather than the entry assembly, which is the test host
+    // (not the service) when running under WebApplicationFactory.
+    private static Type FindLoadedEventType(string eventTypeName) =>
+        AppDomain.CurrentDomain.GetAssemblies()
+            .Select(assembly => assembly.GetType(eventTypeName))
+            .FirstOrDefault(type => type is not null && typeof(IntegrationEvent).IsAssignableFrom(type));
 
     public Task SaveEventAsync(IntegrationEvent @event, IDbContextTransaction transaction)
     {
