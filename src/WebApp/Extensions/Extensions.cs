@@ -117,16 +117,21 @@ public static class Extensions
     /// </exception>
     public static void AddChatProvider(this IHostApplicationBuilder builder)
     {
+        // Telemetry goes inside function invocation, so each model call is its own span under the Turn's span.
+        // Message content stays out of every span outside Development.
+        var captureMessageContent = builder.Environment.IsDevelopment();
         switch (GetChatProvider(builder.Configuration))
         {
             case ChatProvider.Ollama:
-                builder.AddOllamaChatClient().UseFunctionInvocation();
+                builder.AddOllamaChatClient().UseFunctionInvocation()
+                    .UseOpenTelemetry(configure: telemetry => telemetry.EnableSensitiveData = captureMessageContent);
                 break;
             case ChatProvider.Foundry:
-                builder.AddOpenAIClientFromConfiguration("chatModel").AddChatClient().UseFunctionInvocation();
+                builder.AddOpenAIClientFromConfiguration("chatModel").AddChatClient().UseFunctionInvocation()
+                    .UseOpenTelemetry(configure: telemetry => telemetry.EnableSensitiveData = captureMessageContent);
                 break;
             case ChatProvider.Claude:
-                builder.AddClaudeChatClient(); // ClaudeChatPipeline adds function invocation.
+                builder.AddClaudeChatClient(); // ClaudeChatPipeline adds function invocation and telemetry.
                 break;
         }
     }
@@ -190,7 +195,14 @@ public static class Extensions
         var configuration = builder.Configuration;
         // The SDK's own retries cover connection errors, timeouts, 408, 409, 429 and 5xx and honour retry-after; no
         // resilience handler is layered on top, because two retry layers would multiply the attempts.
-        var clientOptions = new ClientOptions { ApiKey = apiKey, Timeout = ClaudeAttemptTimeout, MaxRetries = ClaudeMaxRetries };
+        // The SDK's own spans are off: ClaudeChatPipeline's chat spans cover each call, so none shows up twice.
+        var clientOptions = new ClientOptions
+        {
+            ApiKey = apiKey,
+            Timeout = ClaudeAttemptTimeout,
+            MaxRetries = ClaudeMaxRetries,
+            OpenTelemetry = new() { Traces = new() { Enabled = false } },
+        };
         var anthropic = new AnthropicClient(clientOptions)
             .AsIChatClient(ClaudeChatPipeline.GetModelId(configuration), ClaudeChatPipeline.GetMaxOutputTokens(configuration));
 

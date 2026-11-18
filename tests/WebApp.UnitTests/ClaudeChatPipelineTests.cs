@@ -1,4 +1,7 @@
-﻿using eShop.WebApp.Chatbot;
+﻿using System.Diagnostics;
+using System.Globalization;
+using Anthropic;
+using eShop.WebApp.Chatbot;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 
@@ -25,6 +28,86 @@ public class ClaudeChatPipelineTests
         Assert.AreEqual(
             ("claude-haiku-4-5", (int?)1024, (ReasoningEffort?)ReasoningEffort.None),
             (model.FirstOptions!.ModelId, model.FirstOptions.MaxOutputTokens, model.FirstOptions.Reasoning?.Effort));
+    }
+
+    [TestMethod]
+    public async Task ATurnShowsEachModelCallWithItsTokensAndCacheTokensUnderOneSpanWithTheTurnsTotals()
+    {
+        var messagesApi = new FakeMessagesApi(
+            FakeMessagesApi.ToolUse("lookup", new { input_tokens = 100, output_tokens = 20, cache_read_input_tokens = 1000, cache_creation_input_tokens = 200 }),
+            FakeMessagesApi.Answer("Yes, it is.", new { input_tokens = 150, output_tokens = 10, cache_read_input_tokens = 1200, cache_creation_input_tokens = 50 }));
+        var lookup = AIFunctionFactory.Create(() => "in stock", "lookup");
+        var client = ClaudeChatPipeline.Build(messagesApi.Client().AsIChatClient(), new ConfigurationBuilder().Build());
+        using var spans = new SpanRecorder();
+
+        await spans.RecordAsync(() => client.GetResponseAsync(
+            "Is the helmet in stock?", new ChatOptions { Tools = [lookup] }, TestContext.CancellationToken));
+
+        // Anthropic's input_tokens excludes cached tokens; the adapter adds reads and writes back in (100 + 1000 + 200).
+        CollectionAssert.AreEqual(
+            new (string, string?, long?, long?, long?, long?)[]
+            {
+                ("chat claude-haiku-4-5", "orchestrate_tools", 1300, 20, 1000, 200),
+                ("execute_tool lookup", "orchestrate_tools", null, null, null, null),
+                ("chat claude-haiku-4-5", "orchestrate_tools", 1400, 10, 1200, 50),
+                ("orchestrate_tools", "test", 2700, 30, null, null),
+            },
+            spans.Stopped.Select(span => (span.DisplayName, span.Parent?.DisplayName,
+                Count(span, "gen_ai.usage.input_tokens"), Count(span, "gen_ai.usage.output_tokens"),
+                Count(span, "gen_ai.usage.cache_read.input_tokens"), Count(span, "gen_ai.usage.cache_creation.input_tokens")))
+                .ToArray());
+    }
+
+    private static long? Count(Activity span, string tag) =>
+        span.GetTagItem(tag) is { } value ? Convert.ToInt64(value, CultureInfo.InvariantCulture) : null;
+
+    // Records the Microsoft.Extensions.AI spans of one Turn; tests run in parallel, so it keeps only its own trace.
+    private sealed class SpanRecorder : IDisposable
+    {
+        private static readonly ActivitySource TestSource = new(nameof(ClaudeChatPipelineTests));
+        private readonly ActivityListener _listener;
+        private readonly List<Activity> _stopped = [];
+        private ActivityTraceId _traceId;
+
+        public SpanRecorder()
+        {
+            _listener = new ActivityListener
+            {
+                ShouldListenTo = source => source.Name is "Experimental.Microsoft.Extensions.AI" or nameof(ClaudeChatPipelineTests),
+                Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+                ActivityStopped = Record,
+            };
+            ActivitySource.AddActivityListener(_listener);
+        }
+
+        public IReadOnlyList<Activity> Stopped
+        {
+            get { lock (_stopped) { return [.. _stopped]; } }
+        }
+
+        public async Task RecordAsync(Func<Task> turn)
+        {
+            using (var test = TestSource.StartActivity("test")!)
+            {
+                _traceId = test.TraceId;
+                await turn();
+            }
+        }
+
+        public void Dispose() => _listener.Dispose();
+
+        private void Record(Activity span)
+        {
+            if (span.TraceId != _traceId || span.Source.Name == nameof(ClaudeChatPipelineTests))
+            {
+                return;
+            }
+
+            lock (_stopped)
+            {
+                _stopped.Add(span);
+            }
+        }
     }
 
     // The model is a boundary we don't own: it asks for the lookup tool once, then answers.
