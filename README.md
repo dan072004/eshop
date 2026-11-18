@@ -252,6 +252,19 @@ Start the server from the file. Identity.API offers no dynamic client registrati
 
 Claude Desktop and claude.ai custom connectors call MCP servers from Anthropic's cloud, which can't reach eShop.Mcp or Identity.API on your machine (ADR 0005).
 
+### Agentic workflow
+
+Claude works on this repo from GitHub in two ways, both on the Claude subscription token in the `claude-action` environment:
+
+- **Review.** [`claude-review.yml`](.github/workflows/claude-review.yml) reviews each same-repo PR once when it's opened or marked ready, following [`.github/claude/review.md`](.github/claude/review.md). It leaves advisory inline comments and a summary, and never approves. Comment `@claude review` to get another pass. Example: https://github.com/dan072004/eshop/pull/20, where the review found that a failed Turn leaves two Buyer messages in a row.
+- **Implement.** [`claude-implement.yml`](.github/workflows/claude-implement.yml) is a manual run that takes one `ready-for-agent` ticket from `.scratch/`, for example `gh workflow run "Claude implement" -f ticket=<feature>/issues/NN-<slug>.md`. Before calling the model, it checks the ticket exists, is ready and isn't blocked. Claude then follows [`.github/claude/implement.md`](.github/claude/implement.md): it implements and verifies the ticket, ticks its acceptance boxes, and opens a PR as `claude[bot]`. Example: https://github.com/dan072004/eshop/pull/28.
+
+Compared with working locally:
+
+- The Action suits a small ticket whose acceptance boxes tests can check. It can't run the app, open a browser or use an API key, so a ticket that needs a manual check in the dashboard is better done locally.
+- The local implement skill is interactive: the developer steers it, answers its questions, does the manual checks, and gets a code review on two axes (standards and spec) whose findings are fixed before the PR.
+- The Action's review is a single advisory pass on GitHub. A local review runs before the push, so its findings never reach the PR.
+
 ### Deploy to Azure Container Apps
 
 The AppHost is already configured with an Azure Container Apps environment, so the Aspire CLI can deploy directly from the application model. See the [Aspire Azure Container Apps deployment guide](https://aspire.dev/deployment/azure/container-apps/) for details.

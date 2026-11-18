@@ -12,9 +12,19 @@ See the spec's "Implement trigger", "Input validation before any model call" and
 
 **Blocked by:** 01, 03
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A run naming a file that doesn't exist fails before the Action's step
-- [ ] A run naming an existing ticket whose status isn't `ready-for-agent` fails before the Action's step
-- [ ] A run naming a path outside the ticket pattern (e.g. a spec) fails before the Action's step
-- [ ] The workflow log shows the key on no step other than the Action's
+- [x] A run naming a file that doesn't exist fails before the Action's step
+- [x] A run naming an existing ticket whose status isn't `ready-for-agent` fails before the Action's step
+- [x] A run naming a path outside the ticket pattern (e.g. a spec) fails before the Action's step
+- [x] The workflow log shows the key on no step other than the Action's
+
+## Comments
+
+Checked on GitHub on 2026-11-18. Each failing run stopped at "Check the ticket" and skipped "Implement the ticket":
+
+- Run 44366118756, `hardening/issues/99-nope.md`: "No ticket at .scratch/hardening/issues/99-nope.md".
+- Run 44366134680, `hardening/issues/01-functional-tests-act-as-admin.md`: "has status 'needs-triage', not ready-for-agent".
+- Run 44353066427, `ticket=hardening/issues/04-...` (the input name pasted into the value): "is not a ticket id".
+- The token appears only in the "Implement the ticket" step of run 44362576360.
+- That run implemented assistant-telemetry ticket 01 end to end: PR 28, opened by `claude[bot]`, 54 turns.

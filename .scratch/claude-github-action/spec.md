@@ -1,6 +1,6 @@
 # Spec: Claude reviews every PR and implements one ticket from GitHub
 
-Status: ready-for-agent
+Status: done
 
 ## Problem Statement
 

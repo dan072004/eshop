@@ -12,11 +12,21 @@ See the spec's "Review triggers", "Review permissions and tools" and "Review ins
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A throwaway probe PR, opened ready for review, gets exactly one review: inline comments and one summary comment
-- [ ] A push to that PR afterwards starts no review
-- [ ] An `@claude review` comment on it starts one
-- [ ] A probe PR opened as a draft gets no review until it is marked ready
-- [ ] The workflow log shows the key on no step other than the Action's
-- [ ] The probe PRs are closed unmerged
+- [x] A throwaway probe PR, opened ready for review, gets exactly one review: inline comments and one summary comment
+- [x] A push to that PR afterwards starts no review
+- [x] An `@claude review` comment on it starts one
+- [x] A probe PR opened as a draft gets no review until it is marked ready
+- [x] The workflow log shows the key on no step other than the Action's
+- [x] The probe PRs are closed unmerged
+
+## Comments
+
+Checked on GitHub on 2026-11-18:
+
+- One review per PR opened ready: every PR from PR 20 to PR 29 has exactly one `pull_request` review run. PR 20 got two inline findings and a summary comment.
+- No review on a push: PR 20 was pushed to several times and still had only one review run (the workflow doesn't listen for `synchronize`).
+- Probe PR 30, opened as a draft: the draft's review run was skipped. Marking it ready started one review, which posted its summary comment. An `@claude review` comment then started a second. The summary comments the bot posted itself trigger `issue_comment` too, and those runs were skipped.
+- The token appears only in the "Run anthropics/claude-code-action@v1" step of review run 44366448639.
+- PR 30 was closed unmerged and its branch deleted. The real PRs above stood in for the "opened ready" probe.
