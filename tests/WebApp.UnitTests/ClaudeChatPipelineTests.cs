@@ -34,8 +34,8 @@ public class ClaudeChatPipelineTests
     public async Task ATurnShowsEachModelCallWithItsTokensAndCacheTokensUnderOneSpanWithTheTurnsTotals()
     {
         var messagesApi = new FakeMessagesApi(
-            FakeMessagesApi.ToolUse("lookup", new { input_tokens = 100, output_tokens = 20, cache_read_input_tokens = 1000, cache_creation_input_tokens = 200 }),
-            FakeMessagesApi.Answer("Yes, it is.", new { input_tokens = 150, output_tokens = 10, cache_read_input_tokens = 1200, cache_creation_input_tokens = 50 }));
+            FakeMessagesApi.ToolUse("lookup", new { InputTokens = 100, OutputTokens = 20, CacheReadInputTokens = 1000, CacheCreationInputTokens = 200 }),
+            FakeMessagesApi.Answer("Yes, it is.", new { InputTokens = 150, OutputTokens = 10, CacheReadInputTokens = 1200, CacheCreationInputTokens = 50 }));
         var lookup = AIFunctionFactory.Create(() => "in stock", "lookup");
         var client = ClaudeChatPipeline.Build(messagesApi.Client().AsIChatClient(), new ConfigurationBuilder().Build());
         using var spans = new SpanRecorder();
@@ -64,7 +64,8 @@ public class ClaudeChatPipelineTests
     // Records the Microsoft.Extensions.AI spans of one Turn; tests run in parallel, so it keeps only its own trace.
     private sealed class SpanRecorder : IDisposable
     {
-        private static readonly ActivitySource TestSource = new(nameof(ClaudeChatPipelineTests));
+        private const string TestSourceName = nameof(ClaudeChatPipelineTests);
+        private static readonly ActivitySource TestSource = new(TestSourceName);
         private readonly ActivityListener _listener;
         private readonly List<Activity> _stopped = [];
         private ActivityTraceId _traceId;
@@ -73,7 +74,7 @@ public class ClaudeChatPipelineTests
         {
             _listener = new ActivityListener
             {
-                ShouldListenTo = source => source.Name is "Experimental.Microsoft.Extensions.AI" or nameof(ClaudeChatPipelineTests),
+                ShouldListenTo = source => source.Name is "Experimental.Microsoft.Extensions.AI" or TestSourceName,
                 Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
                 ActivityStopped = Record,
             };
@@ -98,7 +99,7 @@ public class ClaudeChatPipelineTests
 
         private void Record(Activity span)
         {
-            if (span.TraceId != _traceId || span.Source.Name == nameof(ClaudeChatPipelineTests))
+            if (span.TraceId != _traceId || span.Source.Name == TestSourceName)
             {
                 return;
             }

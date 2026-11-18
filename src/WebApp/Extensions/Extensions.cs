@@ -117,18 +117,13 @@ public static class Extensions
     /// </exception>
     public static void AddChatProvider(this IHostApplicationBuilder builder)
     {
-        // Telemetry goes inside function invocation, so each model call is its own span under the Turn's span.
-        // Message content stays out of every span outside Development.
-        var captureMessageContent = builder.Environment.IsDevelopment();
         switch (GetChatProvider(builder.Configuration))
         {
             case ChatProvider.Ollama:
-                builder.AddOllamaChatClient().UseFunctionInvocation()
-                    .UseOpenTelemetry(configure: telemetry => telemetry.EnableSensitiveData = captureMessageContent);
+                builder.AddOllamaChatClient().UseFunctionInvocation().UseChatTelemetry();
                 break;
             case ChatProvider.Foundry:
-                builder.AddOpenAIClientFromConfiguration("chatModel").AddChatClient().UseFunctionInvocation()
-                    .UseOpenTelemetry(configure: telemetry => telemetry.EnableSensitiveData = captureMessageContent);
+                builder.AddFoundryChatClient().UseFunctionInvocation().UseChatTelemetry();
                 break;
             case ChatProvider.Claude:
                 builder.AddClaudeChatClient(); // ClaudeChatPipeline adds function invocation and telemetry.
@@ -161,8 +156,10 @@ public static class Extensions
     {
         const string ConnectionName = "chat";
 
+        // The integration's own chat span would duplicate UseChatTelemetry's, so its tracing is off.
         // Thinking models such as qwen3 reason before every reply, which makes a shopping helper slow.
-        var chatClientBuilder = builder.AddOllamaApiClient(ConnectionName).AddChatClient()
+        var chatClientBuilder = builder.AddOllamaApiClient(ConnectionName, settings => settings.DisableTracing = true)
+            .AddChatClient()
             .ConfigureOptions(options => (options.AdditionalProperties ??= [])
                 .TryAdd(OllamaSharp.Models.OllamaOption.Think.Name, false));
 
@@ -176,6 +173,18 @@ public static class Extensions
 #pragma warning restore EXTEXP0001
 
         return chatClientBuilder;
+    }
+
+    private static ChatClientBuilder AddFoundryChatClient(this IHostApplicationBuilder builder)
+    {
+        // The integration's own chat span (and the OpenAI and Azure SDKs' spans) would duplicate UseChatTelemetry's, so
+        // its tracing is off. AddOpenAIClientFromConfiguration takes no settings callback, so the settings are set here.
+        builder.Configuration.AddInMemoryCollection(
+        [
+            new("Aspire:OpenAI:DisableTracing", "true"),
+            new("Aspire:Azure:AI:OpenAI:DisableTracing", "true"),
+        ]);
+        return builder.AddOpenAIClientFromConfiguration("chatModel").AddChatClient();
     }
 
     // There is no Aspire client integration for Anthropic, so the client is built from the official SDK.

@@ -44,8 +44,8 @@ public static class ClaudeChatPipeline
                 options.Reasoning ??= new ReasoningOptions { Effort = ReasoningEffort.None };
             })
             .UseFunctionInvocation()
-            .UseOpenTelemetry(configure: telemetry => telemetry.EnableSensitiveData = IsDevelopment(services))
-            .Use(call => new CacheWriteTelemetryChatClient(call))
+            .UseChatTelemetry()
+            .Use(inner => new CacheWriteTelemetryChatClient(inner))
             .Build(services);
     }
 
@@ -68,7 +68,4 @@ public static class ClaudeChatPipeline
             : throw new InvalidOperationException(
                 $"The Claude:MaxOutputTokens setting has the invalid value '{value}'. It must be a positive whole number.");
     }
-
-    private static bool IsDevelopment(IServiceProvider? services)
-        => services?.GetService<IHostEnvironment>()?.IsDevelopment() == true;
 }

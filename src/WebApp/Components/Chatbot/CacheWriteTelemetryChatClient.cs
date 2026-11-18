@@ -11,6 +11,8 @@ public sealed class CacheWriteTelemetryChatClient(IChatClient inner) : Delegatin
 {
     private const string AdapterCountName = "CacheCreationInputTokens"; // The Anthropic adapter's additional count.
     private const string TagName = "gen_ai.usage.cache_creation.input_tokens";
+    private const string OperationTagName = "gen_ai.operation.name";
+    private const string ChatOperation = "chat";
 
     // shortcut: streaming responses aren't tagged; the Shopping Assistant doesn't stream. Override streaming if it does.
     public override async Task<ChatResponse> GetResponseAsync(
@@ -24,7 +26,7 @@ public sealed class CacheWriteTelemetryChatClient(IChatClient inner) : Delegatin
     private static void TagCacheWrites(UsageDetails? usage)
     {
         // Without a listener there is no chat span, and the current span belongs to someone else.
-        if (Activity.Current is { } span && span.GetTagItem("gen_ai.operation.name") is "chat"
+        if (Activity.Current is { } span && span.GetTagItem(OperationTagName) is ChatOperation
             && usage?.AdditionalCounts?.TryGetValue(AdapterCountName, out var cacheWrites) == true)
         {
             span.SetTag(TagName, cacheWrites);
