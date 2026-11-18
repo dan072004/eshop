@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [ ] Only successful lookups are cached; a failed lookup is tried again next time
 - [ ] An unresolvable type is reported with an error that names the stored type name and the event id, not an `ArgumentNullException` from the serializer
