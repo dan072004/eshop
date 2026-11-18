@@ -94,7 +94,7 @@ jobs:
             --model claude-opus-5-5
             --max-turns 120
             --permission-mode acceptEdits
-            --allowedTools 'Read,Edit,Write,Glob,Grep,Skill,Bash(git checkout -b "$BRANCH"),Bash(git status *),Bash(git diff *),Bash(git log *),Bash(git add *),Bash(git commit *),Bash(git push -u origin "$BRANCH"),Bash(dotnet restore *),Bash(dotnet build *),Bash(dotnet test *),Bash(dotnet format *),Bash(node .sandcastle/issues.mjs view "$TICKET"),Bash(node .sandcastle/issues.mjs close "$TICKET"),Bash(gh pr create --base main --head "$BRANCH" *),Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/verify-gate.ps1 -Stamp)'
+            --allowedTools 'Read,Edit,Write,Glob,Grep,Skill,Bash(git checkout -b "$BRANCH"),Bash(git status *),Bash(git stash *),Bash(git diff *),Bash(git log *),Bash(git add *),Bash(git commit *),Bash(git push -u origin "$BRANCH"),Bash(dotnet restore *),Bash(dotnet build *),Bash(dotnet test *),Bash(dotnet format *),Bash(node .sandcastle/issues.mjs view "$TICKET"),Bash(node .sandcastle/issues.mjs close "$TICKET"),Bash(gh pr create --base main --head "$BRANCH" *),Bash(pwsh -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/verify-gate.ps1 -Stamp)'
 
       # The transcript isn't printed (it would show tool output on a public repo), so list only what was refused:
       # the tool and its command or path, enough to see which allow rule is missing.
@@ -107,3 +107,15 @@ jobs:
           jq -r '.[] | select(.type == "result") | .permission_denials[]?
             | "\(.tool_name): \(.tool_input.command // .tool_input.file_path // "" | gsub("[\r\n]+"; " ") | .[:200])"
             | "::warning::Refused " + .' "$EXECUTION_FILE"
+
+      # Claude's last message: what it did, or why it stopped without a PR (implement.md asks it to explain).
+      # Its own words, not tool output. stop-commands keeps a line starting with "::" from acting as a command.
+      - name: Show Claude's final message
+        if: always() && steps.claude.outputs.execution_file != ''
+        env:
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+        run: |
+          token=$(uuidgen)
+          echo "::stop-commands::$token"
+          jq -r '.[] | select(.type == "result") | .result // "(no final message)"' "$EXECUTION_FILE"
+          echo "::$token::"
