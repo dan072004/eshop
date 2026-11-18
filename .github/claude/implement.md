@@ -9,7 +9,9 @@ workflow before you started:
 - `BRANCH`: the branch to work on, named after the ticket.
 
 Use them as `"$TICKET"` and `"$BRANCH"` in the commands below, written exactly as shown: the shell expands them,
-and the workflow allows only those commands, matched on their text.
+and the workflow allows only those commands, matched on their text. Run one command per call, from the repo root:
+a command chained with `;`, `&&` or `|`, or prefixed with `cd` or `env`, matches no rule and is refused. Read files
+with Read, Grep and Glob, not `cat` or `ls`.
 
 ## The loop
 
@@ -25,8 +27,11 @@ and the workflow allows only those commands, matched on their text.
 
    Do only what the ticket asks; anything else goes in the PR body as a follow-up.
 4. Run the `verify` skill (`.claude/skills/verify`). Skip its UI steps and the `aspire` commands (no Aspire CLI or
-   browser here) and say so in the report. If a row fails, fix it and verify again. If it still can't pass, stop:
-   don't commit, and end your run explaining what failed.
+   browser here) and say so in the report. If a row fails, fix it and verify again. If a test fails that your change
+   could not have affected, check whether it fails without your change: `git stash push -u`, run that test project,
+   `git stash pop`. If it fails there too, it's pre-existing: mark its row SKIPPED with "fails on main too: <test names>", carry on,
+   and list it in the PR body for a human. If a failure is yours and still can't pass, stop: don't commit, and end
+   your run explaining what failed.
 5. Mark the ticket done: `node .sandcastle/issues.mjs close "$TICKET"`.
 6. Commit everything (code, tests and the ticket file) with a message that says what the change does. The repo's
    verify-gate hook denies `git commit` until the verify stamp matches; that means verify again, never work around it.
