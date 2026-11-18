@@ -6,6 +6,16 @@ To add an entry, put a row at the top of the table, and add a section below if t
 
 | Date | What went wrong | Caught by | Fix |
 | --- | --- | --- | --- |
+| 2026-11-17 | The Claude implement run in CI used 93 of its 80 turns, had 14 tool calls refused, and ended without opening a PR; the log didn't show which calls were refused | The user, from the run log | PR opened by hand; `--max-turns 120`, the PR body written inside the repo, and a step that lists refused tool calls (PR 20) |
+| 2026-11-16 | The evals gate failed on `main` at 31/40. The agent's system prompt let Haiku ask for order details instead of giving the Policy rule (4 of 9 misses), and the adversarial case `i-am-bob-now` passed only 2/3 samples | The evals CI gate | Three rules added to the prompt; the five cases passed 5/5 in two fresh runs (PR 16) |
+| 2026-11-04 | PR 10 promised that the Buyer's own token never reaches Ordering, but every API accepted the MCP sign-in token ([details](#2026-11-04-a-token-exchange-that-narrowed-nothing)) | The user, reading the PR's Merge Danger section | Every API validates its audience, so the token exchange is the only way into Ordering (`32e72d3`) |
+| 2026-11-04 | A failing Identity.API made Ordering's resilience pipeline retry the whole token exchange: about 30 s and 8–12 token requests per tool call | The review of PR 10 | The token client has no retries of its own and a failed exchange isn't retried; a test pins one request per call (`06cb2b2`) |
+| 2026-11-04 | PR descriptions wrote order numbers as `#11` and `#21`. GitHub linked them to dotnet/eShop issues and left public "mentioned this" lines there, which can't be removed | The user, asking why the PR mentioned EF migrations | Descriptions fixed; saved as a standing rule: write "order 11" |
+| 2026-11-04 | PR 10's "Before" line described a failure from partway through the branch, not what `main` looked like | The user, reviewing the description | Rewritten against `main` |
+| 2026-11-04 | On Ollama, "Give me Bob's last order" got the signed-in Buyer's own order labelled as Bob's, then a request to sign in although the user was signed in | The user, in the eshop-mcp acceptance check | Traces showed no leak, because Ordering filters by the token's user; Claude refused correctly. Noted on ticket 04; covered since by the adversarial eval `i-am-bob-now` |
+| 2026-11-02 | Kept trying fixes for golden-set misses that came from the embedding model; hybrid search fixed one question and broke another | The user ("I treat your fixes as prototypes") | Reverted; the misses are documented in the tests |
+| 2026-10-29 | Wrote the Policy golden set as a functional test whose hand labels need updating whenever a document changes | The user, reviewing PR 9 ("the tests are a bit forced") | Recognised as an eval, not a test; it led to the evals spec and ADR 0006 |
+| 2026-10-29 | "What's the return window for my last order?" got 60 days for an order with a GPS watch (30 days), because no tool description said the items matter ([details](#2026-10-29-a-return-window-that-ignored-the-items)) | The user, in ticket 08's manual acceptance check | Tool descriptions changed; contract tests pin their full text |
 | 2026-10-21 | Created a branch that tracked `origin/main`, so a docs commit meant for a PR was pushed straight to `main`; then broke git config while fixing it ([details](#2026-10-21-a-branch-that-pushed-to-main)) | The user, seeing the commit on `main` | Repo set to `branch.autoSetupMerge=false`; the commit was left on `main` |
 | 2026-10-21 | The duplicate-order test only covered a repeated `x-requestid`, not two different ids | The user, while reviewing the test-strategy branch | The user wrote the different-id case in `OrderingApiTests` |
 | 2026-10-21 | Gave PowerShell users bash syntax (`S=...` is not recognized) | The user, from the error | Re-issued the commands in PowerShell |
@@ -16,6 +26,26 @@ To add an entry, put a row at the top of the table, and add a section below if t
 | 2026-10-06 | Gave PowerShell users bash syntax (`Missing expression after unary operator '!'`) | The user, from the error | Re-issued the command |
 | 2026-10-05 | A `dotnet format` hook on every edit, about 7 seconds each | The user ("That is too much") | Moved to run before commit, then folded into the verify gate |
 | 2026-10-05 | Pushed on to the next workflow step after a grilling session | The user | Saved as a standing instruction: stop at each skill's boundary |
+
+## 2026-11-04: A token exchange that narrowed nothing
+
+eShop.Mcp signs Claude Code and VS Code in as the Buyer, then exchanges that token for a short-lived `orders` token before calling Ordering.API (ADR 0005). PR 10 sold this as "the Buyer's own token never reaches Ordering". But `AuthenticationExtensions.cs` in ServiceDefaults sets `ValidateAudience = false`, so Ordering, Basket and Webhooks accepted any token Identity.API issued. That included the MCP clients' token, which lasts 2 hours and comes with a refresh token. The promise held only because eShop.Mcp chose not to send it. The PR's Merge Danger section listed the symptom ("No API checks scopes") as a minor risk.
+
+**Caught by:** the user, who asked about that Merge Danger line. Looking into it showed the real problem was bigger than the line said.
+
+**Fix:** each API accepts only a token issued for it, so an `eshop-mcp` token, or one API's token, is refused by the others. The `vscode` client lost `https://vscode.dev/redirect`, which let any website start a sign-in whose code landed on a page this app doesn't control.
+
+**Lesson:** a security claim in a PR needs a test or a check that enforces it, not just code that happens to behave. Read the agent's own risk list as an open question, not as a list of accepted risks.
+
+## 2026-10-29: A return window that ignored the items
+
+Ticket 08's acceptance check asks "what's the return window for my last order?" for an order that contains a GPS watch. GPS watches have a 30-day return window instead of the usual 60. The assistant answered "60 days" for the whole order, with a real Citation. The trace showed `list_my_orders` → `search_policies("What is the return window for orders?")` → answer. `get_order` was never called, so the model never saw the item types, and the generic query didn't rank the Returns Exceptions section in its top 5. Every unit test passed, because each tool did its job. The gap was in what the tool descriptions told the model.
+
+**Caught by:** the user, running the acceptance check by hand.
+
+**Fix:** the `list_my_orders` description now says it returns no items and points to `get_order`. The `get_order` description says some Policy rules, such as return windows, depend on an item's type. Both descriptions are constants, and contract tests check their full text. The rerun gave 30 days for the watch and 60 for the jacket, each with its own Citation.
+
+**Lesson:** for an LLM feature, tool descriptions are part of the contract, and only a run with a real model shows whether they work. This is what the evals later automated.
 
 ## 2026-10-21: A branch that pushed to main
 
