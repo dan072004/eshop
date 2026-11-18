@@ -32,7 +32,8 @@ with Read, Grep and Glob, not `cat` or `ls`.
    `git stash pop`. If it fails there too, it's pre-existing: mark its row SKIPPED with "fails on main too: <test names>", carry on,
    and list it in the PR body for a human. If a failure is yours and still can't pass, stop: don't commit, and end
    your run explaining what failed.
-5. Mark the ticket done: `node .sandcastle/issues.mjs close "$TICKET"`.
+5. Tick each acceptance box in the ticket that the change meets; leave one it doesn't meet unticked and say why in
+   the PR body. Then mark the ticket done: `node .sandcastle/issues.mjs close "$TICKET"`.
 6. Commit everything (code, tests and the ticket file) with a message that says what the change does. The repo's
    verify-gate hook denies `git commit` until the verify stamp matches; that means verify again, never work around it.
 7. Push: `git push -u origin "$BRANCH"`.

@@ -6,10 +6,10 @@
 
 **Status:** done
 
-- [ ] Only successful lookups are cached; a failed lookup is tried again next time
-- [ ] An unresolvable type is reported with an error that names the stored type name and the event id, not an `ArgumentNullException` from the serializer
-- [ ] Tested against a real database: a pending entry with an unknown type name is marked Failed with that error logged, and the transaction's other pending entries are still published
-- [ ] One unresolvable event is marked Failed and skipped; the other pending events in the same transaction are still published (decided in triage, 2026-11-18)
+- [x] Only successful lookups are cached; a failed lookup is tried again next time
+- [x] An unresolvable type is reported with an error that names the stored type name and the event id, not an `ArgumentNullException` from the serializer
+- [x] Tested against a real database: a pending entry with an unknown type name is marked Failed with that error logged, and the transaction's other pending entries are still published
+- [x] One unresolvable event is marked Failed and skipped; the other pending events in the same transaction are still published (decided in triage, 2026-11-18)
 
 ## Comments
 
@@ -39,10 +39,10 @@
 - `EventStateEnum.PublishedFailed`: the existing state for a failed event; no new state.
 
 **Acceptance criteria:**
-- [ ] With two pending entries in one transaction, one with an unknown type name and one valid, publishing marks the unknown one `PublishedFailed` and the valid one `Published` (states read back from a real Postgres database), and only the valid event reaches the event bus.
-- [ ] The logged error for the unknown entry contains its stored type name and its event id.
-- [ ] A failed lookup isn't cached (checked in review; not observable through the seam, see the comment above).
-- [ ] Existing Ordering and Catalog tests still pass.
+- [x] With two pending entries in one transaction, one with an unknown type name and one valid, publishing marks the unknown one `PublishedFailed` and the valid one `Published` (states read back from a real Postgres database), and only the valid event reaches the event bus.
+- [x] The logged error for the unknown entry contains its stored type name and its event id.
+- [x] A failed lookup isn't cached (checked in review; not observable through the seam, see the comment above).
+- [x] Existing Ordering and Catalog tests still pass.
 
 **Seams (CLAUDE.md, Testing):** the outbox query and state updates against the real database, through the Ordering functional tests' Postgres; `IEventBus` is a boundary we don't own, so a fake or NSubstitute there only.
 
