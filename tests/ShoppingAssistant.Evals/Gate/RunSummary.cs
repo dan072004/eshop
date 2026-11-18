@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Text;
+using eShop.WebApp.Chatbot;
 using ShoppingAssistant.Evals.Cases;
 
 namespace ShoppingAssistant.Evals.Gate;
@@ -118,9 +119,9 @@ internal static class RunSummary
         foreach (var usage in byModel)
         {
             summary.Append(CultureInfo.InvariantCulture,
-                $"| {usage.Model} | {Tokens(usage.InputTokens)} | {Tokens(usage.OutputTokens)} | {Dollars(ModelPrices.Cost(usage))} |\n");
+                $"| {usage.Model} | {Tokens(usage.InputTokens)} | {Tokens(usage.OutputTokens)} | {Dollars(EstimateCost(usage))} |\n");
         }
-        var total = byModel.Select(ModelPrices.Cost).Where(c => c is not null).Sum();
+        var total = byModel.Select(EstimateCost).Where(c => c is not null).Sum();
         summary.Append(CultureInfo.InvariantCulture,
             $"| **Total** | {Tokens(byModel.Sum(u => u.InputTokens))} | {Tokens(byModel.Sum(u => u.OutputTokens))} | **{Dollars(total)}** |\n\n");
         summary.Append("Only calls that reached a model count; a call replayed from the cache cost nothing this run.\n\n");
@@ -138,21 +139,8 @@ internal static class RunSummary
     private static string Tokens(long count) => count.ToString("N0", CultureInfo.InvariantCulture);
 
     private static string Dollars(decimal? cost) => cost is { } dollars ? "$" + dollars.ToString("F3", CultureInfo.InvariantCulture) : "unknown";
-}
 
-/// <summary>Anthropic's list prices per million tokens, for the models the evals use.</summary>
-internal static class ModelPrices
-{
-    private static readonly (string ModelPrefix, decimal Input, decimal Output)[] PerMillionTokens =
-    [
-        ("claude-haiku-4-5", 1m, 5m),
-        ("claude-sonnet-5-5", 2m, 10m),
-    ];
-
-    /// <summary>The cost of <paramref name="usage"/>, or null for a model with no listed price.</summary>
-    public static decimal? Cost(TokenUsage usage) =>
-        PerMillionTokens.Where(p => usage.Model.StartsWith(p.ModelPrefix, StringComparison.Ordinal))
-            .Select(p => (usage.InputTokens * p.Input + usage.OutputTokens * p.Output) / 1_000_000m)
-            .Cast<decimal?>()
-            .FirstOrDefault();
+    // The evals' usage record has no cache tokens yet, so they are priced as zero until prompt caching adds them.
+    private static decimal? EstimateCost(TokenUsage usage)
+        => ClaudePrices.EstimateCost(usage.Model, new ClaudeTokenCounts(Input: usage.InputTokens, Output: usage.OutputTokens));
 }
