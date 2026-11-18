@@ -38,7 +38,8 @@ with Read, Grep and Glob, not `cat` or `ls`.
 7. Push: `git push -u origin "$BRANCH"`.
 8. Write the PR body to `artifacts/pr-body.md` (inside the repo and git-ignored; a file outside the repo is refused),
    then open the PR against `main` with
-   `gh pr create --base main --head "$BRANCH" --title "..." --body-file artifacts/pr-body.md`. The body:
+   `gh pr create --base main --head <branch> --title "..." --body-file artifacts/pr-body.md`, with the branch name
+   from your prompt written out, not `"$BRANCH"`: a variable there is refused. The body:
    - names the ticket by its path (`.scratch/$TICKET`) and links its spec;
    - says what changed and why, in a few lines;
    - includes the verify report table;
