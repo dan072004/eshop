@@ -4,10 +4,10 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The table lists `claude-haiku-4-5` and the evals' judge model, keyed by model id prefix, with input and output prices per million tokens
-- [ ] Cache reads are priced at 0.1× and cache writes at 1.25× the input price (the 5-minute cache lifetime). A comment records that assumption and the date the prices were taken
-- [ ] A model with no listed price has no cost (not $0)
-- [ ] The evals' own copy of the table is deleted; the run summary uses the shared one, and the existing run summary test passes unchanged
-- [ ] A plain fast test covers input, output, cache-read and cache-write pricing and an unlisted model, with expected costs as literals
+- [x] The table lists `claude-haiku-4-5` and the evals' judge model, keyed by model id prefix, with input and output prices per million tokens
+- [x] Cache reads are priced at 0.1× and cache writes at 1.25× the input price (the 5-minute cache lifetime). A comment records that assumption and the date the prices were taken
+- [x] A model with no listed price has no cost (not $0)
+- [x] The evals' own copy of the table is deleted; the run summary uses the shared one, and the existing run summary test passes unchanged
+- [x] A plain fast test covers input, output, cache-read and cache-write pricing and an unlisted model, with expected costs as literals
