@@ -18,7 +18,18 @@ This is a fork of Microsoft's [dotnet/eShop](https://github.com/dotnet/eShop). I
 | Mock-heavy tests | Tests at real seams (Postgres, Redis, HTTP), written down as the repo's convention | [4](https://github.com/dan072004/eshop/pull/4) |
 | No CI agent | Claude reviews every PR and can implement a ticket end to end | [17](https://github.com/dan072004/eshop/pull/17), [28](https://github.com/dan072004/eshop/pull/28) |
 
-**How it was built.** Claude Code wrote the code. I wrote the specs and tickets (`.scratch/`), made the design decisions ([ADRs](docs/adr)), set the guardrails (`CLAUDE.md`, a verify gate that blocks commits) and reviewed every change. The [correction log](docs/correction-log.md) lists where the agents went wrong and how each mistake was caught.
+**How it was built.** Spec-driven, with Claude Code and [Matt Pocock's skills](https://github.com/mattpocock/skills). Each feature followed the same loop:
+
+1. **Grill:** Claude questioned me about the idea until every decision was made. The decisions became [ADRs](docs/adr) and [GLOSSARY](GLOSSARY.md) terms.
+2. **Spec and tickets:** Claude wrote the spec and split it into tickets (`.scratch/`). I reviewed and corrected both.
+3. **Implement:** Claude implemented one ticket at a time, test-first, behind a verify gate that blocks commits until the build and the matching tests pass.
+4. **Review:** a code review against the repo's standards and the spec, then mine, before every merge.
+
+I made the decisions, set the guardrails (`CLAUDE.md`, the testing convention, hooks) and reviewed every change; Claude wrote the specs, tickets and code. The [correction log](docs/correction-log.md) lists where the agents went wrong and how each mistake was caught.
+
+---
+
+*The original eShop README follows.*
 
 ![eShop Reference Application architecture diagram](img/eshop_architecture.png)
 
