@@ -4,7 +4,7 @@ A reference .NET application implementing an e-commerce website using a services
 
 ## What I added
 
-This is a fork of Microsoft's [dotnet/eShop](https://github.com/dotnet/eShop). I added an AI layer: a Shopping Assistant that answers from the store's Policies and the Buyer's own orders, a C# MCP server with the same tools, and evals that gate CI. eShop's architecture stays as it was: the assistant calls the existing APIs, and Ordering.API still decides which orders a Buyer may see.
+This is a fork of Microsoft's [dotnet/eShop](https://github.com/dotnet/eShop). It already had a chatbot; I turned it into a Shopping Assistant that answers from the store's Policies and the Buyer's own orders, and added a C# MCP server with the same tools and evals that gate CI. eShop's architecture stays as it was: the assistant calls the existing APIs, and Ordering.API still decides which orders a Buyer may see.
 
 [![Shopping Assistant evals](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fdan072004%2Feshop%2Fbadges%2Fevals.json)](https://github.com/dan072004/eshop/actions/workflows/evals.yml)
 
