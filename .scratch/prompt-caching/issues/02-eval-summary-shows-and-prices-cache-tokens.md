@@ -6,9 +6,9 @@ Remember the adapter's input count already includes cached tokens (assistant-tel
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A fast test next to the existing gate tests: given case results whose usage includes known cache-read and cache-write tokens on a priced model, the summary table shows those counts and the cache-aware estimated cost, written as literals
-- [ ] Judge usage shows zero cache tokens
-- [ ] Without `ESHOP_EVALS=1`, the eval project's fast tests still pass with no API key
-- [ ] Nothing in docs or code calls the Prompt Cache "cached answers" or vice versa
+- [x] A fast test next to the existing gate tests: given case results whose usage includes known cache-read and cache-write tokens on a priced model, the summary table shows those counts and the cache-aware estimated cost, written as literals
+- [x] Judge usage shows zero cache tokens
+- [x] Without `ESHOP_EVALS=1`, the eval project's fast tests still pass with no API key
+- [x] Nothing in docs or code calls the Prompt Cache "cached answers" or vice versa
