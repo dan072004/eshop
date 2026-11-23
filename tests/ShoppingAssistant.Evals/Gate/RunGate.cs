@@ -147,7 +147,10 @@ public sealed record SampleResult(
 public sealed record CheckFailure(string Check, string Reason);
 
 /// <param name="Model">The model id the response reported.</param>
-public sealed record TokenUsage(string Model, long InputTokens, long OutputTokens);
+/// <param name="InputTokens">All input tokens, as the adapter reports them: they include the cache reads and writes.</param>
+/// <param name="CacheReadTokens">Input tokens read from Anthropic's Prompt Cache.</param>
+/// <param name="CacheWriteTokens">Input tokens written to Anthropic's Prompt Cache.</param>
+public sealed record TokenUsage(string Model, long InputTokens, long OutputTokens, long CacheReadTokens = 0, long CacheWriteTokens = 0);
 
 /// <summary>The calibration set's run: its judge errors, what it cost, or why it has no verdicts.</summary>
 public sealed record CalibrationOutcome(IReadOnlyList<JudgeError> JudgeErrors, IReadOnlyList<TokenUsage> Usage, string? InfrastructureError = null);
