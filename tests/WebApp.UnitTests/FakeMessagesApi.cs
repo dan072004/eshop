@@ -12,7 +12,14 @@ namespace eShop.WebApp.UnitTests;
 internal sealed class FakeMessagesApi(params object[] messages) : HttpMessageHandler
 {
     private static readonly JsonSerializerOptions SnakeCase = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
+    private readonly List<JsonElement> _requests = [];
     private int _next;
+
+    /// <summary>The JSON body of each request sent to this fake, in order.</summary>
+    public IReadOnlyList<JsonElement> Requests
+    {
+        get { lock (_requests) { return [.. _requests]; } }
+    }
 
     /// <summary>A real Anthropic client whose requests go to this fake.</summary>
     public AnthropicClient Client() => new(new() { ApiKey = "sk-ant-test", HttpClient = new HttpClient(this), MaxRetries = 0 });
@@ -24,13 +31,19 @@ internal sealed class FakeMessagesApi(params object[] messages) : HttpMessageHan
     /// <summary>An assistant message answering with <paramref name="text"/>, with the given usage.</summary>
     public static object Answer(string text, object usage) => Message(new { Type = "text", Text = text }, "end_turn", usage);
 
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        if (request.Content is not null)
+        {
+            var body = JsonDocument.Parse(await request.Content.ReadAsStringAsync(cancellationToken)).RootElement;
+            lock (_requests) { _requests.Add(body); }
+        }
+
         var message = messages[Interlocked.Increment(ref _next) - 1];
-        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        return new HttpResponseMessage(HttpStatusCode.OK)
         {
             Content = new StringContent(JsonSerializer.Serialize(message, SnakeCase), Encoding.UTF8, "application/json"),
-        });
+        };
     }
 
     private static object Message(object content, string stopReason, object usage) => new

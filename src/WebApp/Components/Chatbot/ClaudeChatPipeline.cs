@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using Anthropic.Models.Messages;
 using Microsoft.Extensions.AI;
 
 namespace eShop.WebApp.Chatbot;
@@ -16,8 +17,9 @@ public static class ClaudeChatPipeline
     /// <summary>
     /// Wraps <paramref name="inner"/> with a turn deadline, function invocation, telemetry and request defaults: the model
     /// id and output limit (<c>claude-haiku-4-5</c> and 1024, overridable under <c>Claude:ModelId</c> and
-    /// <c>Claude:MaxOutputTokens</c>) and thinking disabled. Options a caller sets take precedence. Each model call is a
-    /// <c>chat</c> span with its tokens, cache tokens and, for a listed model, estimated cost, under the Turn's
+    /// <c>Claude:MaxOutputTokens</c>), thinking disabled, and automatic prompt caching (a top-level <c>cache_control</c> of
+    /// type <c>ephemeral</c>, through the raw representation factory). Options a caller sets take precedence. Each model
+    /// call is a <c>chat</c> span with its tokens, cache tokens and, for a listed model, estimated cost, under the Turn's
     /// <c>orchestrate_tools</c> span with the Turn's totals.
     /// </summary>
     /// <param name="services">
@@ -43,12 +45,23 @@ public static class ClaudeChatPipeline
                 options.ModelId ??= modelId;
                 options.MaxOutputTokens ??= maxOutputTokens;
                 options.Reasoning ??= new ReasoningOptions { Effort = ReasoningEffort.None };
+                options.RawRepresentationFactory ??= _ => AskForPromptCaching(options);
             })
             .UseFunctionInvocation()
             .UseChatTelemetry()
             .Use(inner => new ClaudeUsageTelemetryChatClient(inner))
             .Build(services);
     }
+
+    // Automatic caching: Anthropic caches up to the last cacheable block, so the cached prefix grows through the Turn.
+    // The adapter sends these parameters' model and output limit over the options' own, so they are copied in.
+    private static MessageCreateParams AskForPromptCaching(ChatOptions options) => new()
+    {
+        Model = options.ModelId!,
+        MaxTokens = options.MaxOutputTokens!.Value,
+        Messages = [],
+        CacheControl = new CacheControlEphemeral(),
+    };
 
     /// <summary>The model id: <c>Claude:ModelId</c>, or <c>claude-haiku-4-5</c>.</summary>
     public static string GetModelId(IConfiguration configuration)

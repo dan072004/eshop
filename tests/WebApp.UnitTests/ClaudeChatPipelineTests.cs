@@ -1,7 +1,9 @@
 ﻿using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Globalization;
+using System.Text.Json;
 using Anthropic;
+using MessageCreateParams = Anthropic.Models.Messages.MessageCreateParams;
 using eShop.WebApp.Chatbot;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
@@ -82,6 +84,41 @@ public class ClaudeChatPipelineTests
             telemetry.Spans.Select(span => (span.DisplayName, Count(span, "gen_ai.usage.input_tokens"),
                 span.GetTagItem("eshop.assistant.estimated_cost_usd"))).ToArray());
         Assert.IsEmpty(telemetry.CostIncreases);
+    }
+
+    [TestMethod]
+    public async Task EveryRequestToAnthropicAsksForPromptCachingAndKeepsTheModelAndOutputLimit()
+    {
+        var anthropic = TwoCallTurn();
+        var client = ClaudeChatPipeline.Build(anthropic.Client().AsIChatClient(), new ConfigurationBuilder().Build());
+
+        await AskAboutTheHelmet(client);
+
+        var expected = JsonDocument.Parse("""{ "type": "ephemeral" }""").RootElement;
+        Assert.HasCount(2, anthropic.Requests);
+        foreach (var request in anthropic.Requests)
+        {
+            Assert.AreEqual(("claude-haiku-4-5", 1024),
+                (request.GetProperty("model").GetString(), request.GetProperty("max_tokens").GetInt32()));
+            Assert.IsTrue(request.TryGetProperty("cache_control", out var cacheControl), request.ToString());
+            Assert.IsTrue(JsonElement.DeepEquals(expected, cacheControl), request.ToString());
+        }
+    }
+
+    [TestMethod]
+    public async Task ARawRepresentationFactoryTheCallerSetTakesPrecedenceOverPromptCaching()
+    {
+        var anthropic = new FakeMessagesApi(FakeMessagesApi.Answer("Yes, it is.", new { InputTokens = 10, OutputTokens = 5 }));
+        var client = ClaudeChatPipeline.Build(anthropic.Client().AsIChatClient(), new ConfigurationBuilder().Build());
+        var options = new ChatOptions
+        {
+            RawRepresentationFactory = _ => new MessageCreateParams { Model = "claude-haiku-4-5", MaxTokens = 256, Messages = [] },
+        };
+
+        await client.GetResponseAsync("Is the helmet in stock?", options, TestContext.CancellationToken);
+
+        var request = anthropic.Requests.Single();
+        Assert.AreEqual((256, false), (request.GetProperty("max_tokens").GetInt32(), request.TryGetProperty("cache_control", out _)));
     }
 
     // The model asks for the lookup tool, then answers; each call has its own uncached, output, cache-read and cache-write tokens.
