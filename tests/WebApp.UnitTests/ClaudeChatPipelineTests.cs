@@ -16,21 +16,17 @@ public class ClaudeChatPipelineTests
     public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    public async Task WrapsAnyInnerClientWithFunctionInvocationThinkingOffAndTheDefaultModel()
+    public async Task WrapsAnyInnerClientWithFunctionInvocation()
     {
-        var model = new ToolCallingChatClient();
         var lookups = 0;
         var lookup = AIFunctionFactory.Create(() => { lookups++; return "in stock"; }, "lookup");
-        var client = ClaudeChatPipeline.Build(model, new ConfigurationBuilder().Build());
+        var client = ClaudeChatPipeline.Build(new ToolCallingChatClient(), new ConfigurationBuilder().Build());
 
         var response = await client.GetResponseAsync(
             "Is the helmet in stock?", new ChatOptions { Tools = [lookup] }, TestContext.CancellationToken);
 
         Assert.AreEqual("Yes, it is.", response.Text);
         Assert.AreEqual(1, lookups);
-        Assert.AreEqual(
-            ("claude-haiku-4-5", (int?)1024, (ReasoningEffort?)ReasoningEffort.None),
-            (model.FirstOptions!.ModelId, model.FirstOptions.MaxOutputTokens, model.FirstOptions.Reasoning?.Effort));
     }
 
     [TestMethod]
@@ -87,21 +83,24 @@ public class ClaudeChatPipelineTests
     }
 
     [TestMethod]
-    public async Task EveryRequestToAnthropicAsksForPromptCachingAndKeepsTheModelAndOutputLimit()
+    public async Task EveryRequestToAnthropicAsksForPromptCachingWithTheDefaultModelOutputLimitAndThinkingDisabled()
     {
         var anthropic = TwoCallTurn();
         var client = ClaudeChatPipeline.Build(anthropic.Client().AsIChatClient(), new ConfigurationBuilder().Build());
 
         await AskAboutTheHelmet(client);
 
-        var expected = JsonDocument.Parse("""{ "type": "ephemeral" }""").RootElement;
+        var ephemeral = JsonDocument.Parse("""{ "type": "ephemeral" }""").RootElement;
+        var disabled = JsonDocument.Parse("""{ "type": "disabled" }""").RootElement;
         Assert.HasCount(2, anthropic.Requests);
         foreach (var request in anthropic.Requests)
         {
-            Assert.AreEqual(("claude-haiku-4-5", 1024),
-                (request.GetProperty("model").GetString(), request.GetProperty("max_tokens").GetInt32()));
+            Assert.AreEqual("claude-haiku-4-5", request.GetProperty("model").GetString());
+            Assert.AreEqual(1024, request.GetProperty("max_tokens").GetInt32());
+            Assert.IsTrue(request.TryGetProperty("thinking", out var thinking), request.ToString());
+            Assert.IsTrue(JsonElement.DeepEquals(disabled, thinking), request.ToString());
             Assert.IsTrue(request.TryGetProperty("cache_control", out var cacheControl), request.ToString());
-            Assert.IsTrue(JsonElement.DeepEquals(expected, cacheControl), request.ToString());
+            Assert.IsTrue(JsonElement.DeepEquals(ephemeral, cacheControl), request.ToString());
         }
     }
 
@@ -118,7 +117,8 @@ public class ClaudeChatPipelineTests
         await client.GetResponseAsync("Is the helmet in stock?", options, TestContext.CancellationToken);
 
         var request = anthropic.Requests.Single();
-        Assert.AreEqual((256, false), (request.GetProperty("max_tokens").GetInt32(), request.TryGetProperty("cache_control", out _)));
+        Assert.AreEqual(256, request.GetProperty("max_tokens").GetInt32());
+        Assert.IsFalse(request.TryGetProperty("cache_control", out _), request.ToString());
     }
 
     // The model asks for the lookup tool, then answers; each call has its own uncached, output, cache-read and cache-write tokens.
@@ -234,11 +234,8 @@ public class ClaudeChatPipelineTests
     {
         private int _calls;
 
-        public ChatOptions? FirstOptions { get; private set; }
-
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
-            FirstOptions ??= options?.Clone();
             var reply = _calls++ == 0
                 ? new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("call-1", "lookup")])
                 : new ChatMessage(ChatRole.Assistant, "Yes, it is.");

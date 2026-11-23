@@ -112,27 +112,27 @@ internal static class RunSummary
             .Concat(calibration?.Usage ?? [])
             .GroupBy(u => u.Model)
             .OrderBy(g => g.Key, StringComparer.Ordinal)
-            .Select(g => new TokenUsage(
-                g.Key, g.Sum(u => u.InputTokens), g.Sum(u => u.OutputTokens), g.Sum(u => u.CacheReadTokens), g.Sum(u => u.CacheWriteTokens)))
+            .Select(g => Sum(g.Key, g))
             .ToList();
 
         summary.Append("### Tokens and estimated cost\n\n"
             + "| Model | Input tokens | Cache-read tokens | Cache-write tokens | Output tokens | Estimated cost |\n|---|---:|---:|---:|---:|---:|\n");
         foreach (var usage in byModel)
         {
-            AppendCostRow(summary, usage, Dollars(EstimateCost(usage)));
+            AppendCostRow(summary, usage.Model, usage, Dollars(EstimateCost(usage)));
         }
-        var total = new TokenUsage(
-            "**Total**", byModel.Sum(u => u.InputTokens), byModel.Sum(u => u.OutputTokens), byModel.Sum(u => u.CacheReadTokens), byModel.Sum(u => u.CacheWriteTokens));
-        AppendCostRow(summary, total, $"**{Dollars(byModel.Select(EstimateCost).Where(c => c is not null).Sum())}**");
+        AppendCostRow(summary, "**Total**", Sum("all models", byModel), $"**{Dollars(byModel.Select(EstimateCost).Where(c => c is not null).Sum())}**");
         summary.Append("\nInput tokens include the Prompt Cache's reads and writes, which are priced at their own rates. "
             + "Only calls that reached a model count; a call replayed from the Cached Answers cost nothing this run.\n\n");
     }
 
-    private static void AppendCostRow(StringBuilder summary, TokenUsage usage, string cost)
+    private static TokenUsage Sum(string model, IEnumerable<TokenUsage> usage) => new(
+        model, usage.Sum(u => u.InputTokens), usage.Sum(u => u.OutputTokens), usage.Sum(u => u.CacheReadTokens), usage.Sum(u => u.CacheWriteTokens));
+
+    private static void AppendCostRow(StringBuilder summary, string label, TokenUsage usage, string cost)
     {
         summary.Append(CultureInfo.InvariantCulture,
-            $"| {usage.Model} | {Tokens(usage.InputTokens)} | {Tokens(usage.CacheReadTokens)} | {Tokens(usage.CacheWriteTokens)} | {Tokens(usage.OutputTokens)} | {cost} |\n");
+            $"| {label} | {Tokens(usage.InputTokens)} | {Tokens(usage.CacheReadTokens)} | {Tokens(usage.CacheWriteTokens)} | {Tokens(usage.OutputTokens)} | {cost} |\n");
     }
 
     private static void AppendSamples(StringBuilder summary, IReadOnlyList<CaseResult> cases)
@@ -148,11 +148,6 @@ internal static class RunSummary
 
     private static string Dollars(decimal? cost) => cost is { } dollars ? "$" + dollars.ToString("F3", CultureInfo.InvariantCulture) : "unknown";
 
-    // The input count includes the cache reads and writes, so they come off it to leave the uncached input.
-    private static decimal? EstimateCost(TokenUsage usage)
-        => ClaudePrices.EstimateCost(usage.Model, new ClaudeTokenCounts(
-            Input: usage.InputTokens - usage.CacheReadTokens - usage.CacheWriteTokens,
-            Output: usage.OutputTokens,
-            CacheRead: usage.CacheReadTokens,
-            CacheWrite: usage.CacheWriteTokens));
+    private static decimal? EstimateCost(TokenUsage usage) => ClaudePrices.EstimateCost(usage.Model,
+        ClaudeTokenCounts.FromAdapterTotals(usage.InputTokens, usage.OutputTokens, usage.CacheReadTokens, usage.CacheWriteTokens));
 }

@@ -107,12 +107,13 @@ public sealed class CachedModel(IChatClient model, IEvaluationResponseCacheProvi
             {
                 lock (_usage)
                 {
+                    var tokens = ClaudeTokenCounts.FromAdapterUsage(usage);
                     _usage.Add(new(
                         response.ModelId ?? options?.ModelId ?? "unknown",
                         usage.InputTokenCount ?? 0,
-                        usage.OutputTokenCount ?? 0,
-                        usage.CachedInputTokenCount ?? 0,
-                        ClaudeUsageTelemetryChatClient.CacheWrites(usage) ?? 0));
+                        tokens.Output,
+                        tokens.CacheRead,
+                        tokens.CacheWrite));
                 }
             }
             return response;

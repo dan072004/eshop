@@ -15,7 +15,6 @@ public sealed class ClaudeUsageTelemetryChatClient(IChatClient inner) : Delegati
     /// <summary>The meter of the estimated cost counter, which WebApp collects.</summary>
     public const string MeterName = "eShop.WebApp.ShoppingAssistant";
 
-    private const string AdapterCacheWriteCountName = "CacheCreationInputTokens"; // The Anthropic adapter's additional count.
     private const string CacheWriteTagName = "gen_ai.usage.cache_creation.input_tokens";
     private const string CostTagName = "eshop.assistant.estimated_cost_usd";
     private const string ModelTagName = "gen_ai.request.model";
@@ -33,9 +32,9 @@ public sealed class ClaudeUsageTelemetryChatClient(IChatClient inner) : Delegati
     {
         var response = await base.GetResponseAsync(messages, options, cancellationToken);
         var modelCall = CurrentModelCallSpan();
-        var cacheWrites = CacheWrites(response.Usage);
-        modelCall?.SetTag(CacheWriteTagName, cacheWrites);
-        if (options?.ModelId is { } modelId && EstimateCost(modelId, response.Usage, cacheWrites) is { } cost)
+        var tokens = ClaudeTokenCounts.FromAdapterUsage(response.Usage);
+        modelCall?.SetTag(CacheWriteTagName, tokens.CacheWrite);
+        if (options?.ModelId is { } modelId && ClaudePrices.EstimateCost(modelId, tokens) is { } cost)
         {
             RecordCost(modelCall, modelId, cost);
         }
@@ -46,22 +45,6 @@ public sealed class ClaudeUsageTelemetryChatClient(IChatClient inner) : Delegati
     // Without a listener there is no chat span, and the current span belongs to someone else.
     private static Activity? CurrentModelCallSpan()
         => Activity.Current is { } span && span.GetTagItem(OperationTagName) is ChatOperation ? span : null;
-
-    /// <summary>The cache-write tokens the Anthropic adapter reported, or null when it reported none.</summary>
-    public static long? CacheWrites(UsageDetails? usage)
-        => usage?.AdditionalCounts?.TryGetValue(AdapterCacheWriteCountName, out var cacheWrites) == true ? cacheWrites : null;
-
-    // The adapter's input count includes cache reads and writes, so they come off it to leave the uncached input.
-    private static decimal? EstimateCost(string modelId, UsageDetails? usage, long? cacheWrites)
-    {
-        var cacheReads = usage?.CachedInputTokenCount ?? 0;
-        var tokens = new ClaudeTokenCounts(
-            Input: (usage?.InputTokenCount ?? 0) - cacheReads - (cacheWrites ?? 0),
-            Output: usage?.OutputTokenCount ?? 0,
-            CacheRead: cacheReads,
-            CacheWrite: cacheWrites ?? 0);
-        return ClaudePrices.EstimateCost(modelId, tokens);
-    }
 
     private static void RecordCost(Activity? modelCall, string modelId, decimal cost)
     {

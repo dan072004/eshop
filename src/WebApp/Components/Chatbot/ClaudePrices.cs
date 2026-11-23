@@ -1,4 +1,6 @@
-﻿namespace eShop.WebApp.Chatbot;
+﻿using Microsoft.Extensions.AI;
+
+namespace eShop.WebApp.Chatbot;
 
 /// <summary>
 /// Anthropic's list prices, the one table the Shopping Assistant and the evals estimate Claude costs from.
@@ -41,4 +43,18 @@ public static class ClaudePrices
 }
 
 /// <summary>The tokens a Claude call used, by how they are priced. Input excludes cache reads and writes.</summary>
-public sealed record ClaudeTokenCounts(long Input = 0, long Output = 0, long CacheRead = 0, long CacheWrite = 0);
+public sealed record ClaudeTokenCounts(long Input = 0, long Output = 0, long CacheRead = 0, long CacheWrite = 0)
+{
+    private const string AdapterCacheWriteCountName = "CacheCreationInputTokens"; // The Anthropic adapter's additional count.
+
+    /// <summary>The tokens in the Anthropic adapter's <paramref name="usage"/>, or none when it reported none.</summary>
+    public static ClaudeTokenCounts FromAdapterUsage(UsageDetails? usage) => FromAdapterTotals(
+        input: usage?.InputTokenCount ?? 0,
+        output: usage?.OutputTokenCount ?? 0,
+        cacheRead: usage?.CachedInputTokenCount ?? 0,
+        cacheWrite: usage?.AdditionalCounts?.TryGetValue(AdapterCacheWriteCountName, out var cacheWrites) == true ? cacheWrites : 0);
+
+    /// <summary>The tokens of totals counted the adapter's way, where <paramref name="input"/> includes the cache reads and writes.</summary>
+    public static ClaudeTokenCounts FromAdapterTotals(long input, long output, long cacheRead, long cacheWrite)
+        => new(Input: input - cacheRead - cacheWrite, Output: output, CacheRead: cacheRead, CacheWrite: cacheWrite);
+}
