@@ -120,13 +120,13 @@ public static class Extensions
         switch (GetChatProvider(builder.Configuration))
         {
             case ChatProvider.Ollama:
-                builder.AddOllamaChatClient().UseFunctionInvocation();
+                builder.AddOllamaChatClient().UseFunctionInvocation().UseChatTelemetry();
                 break;
             case ChatProvider.Foundry:
-                builder.AddOpenAIClientFromConfiguration("chatModel").AddChatClient().UseFunctionInvocation();
+                builder.AddFoundryChatClient().UseFunctionInvocation().UseChatTelemetry();
                 break;
             case ChatProvider.Claude:
-                builder.AddClaudeChatClient(); // ClaudeChatPipeline adds function invocation.
+                builder.AddClaudeChatClient(); // ClaudeChatPipeline adds function invocation and telemetry.
                 break;
         }
     }
@@ -156,8 +156,10 @@ public static class Extensions
     {
         const string ConnectionName = "chat";
 
+        // The integration's own chat span would duplicate UseChatTelemetry's, so its tracing is off.
         // Thinking models such as qwen3 reason before every reply, which makes a shopping helper slow.
-        var chatClientBuilder = builder.AddOllamaApiClient(ConnectionName).AddChatClient()
+        var chatClientBuilder = builder.AddOllamaApiClient(ConnectionName, settings => settings.DisableTracing = true)
+            .AddChatClient()
             .ConfigureOptions(options => (options.AdditionalProperties ??= [])
                 .TryAdd(OllamaSharp.Models.OllamaOption.Think.Name, false));
 
@@ -171,6 +173,18 @@ public static class Extensions
 #pragma warning restore EXTEXP0001
 
         return chatClientBuilder;
+    }
+
+    private static ChatClientBuilder AddFoundryChatClient(this IHostApplicationBuilder builder)
+    {
+        // The integration's own chat span (and the OpenAI and Azure SDKs' spans) would duplicate UseChatTelemetry's, so
+        // its tracing is off. AddOpenAIClientFromConfiguration takes no settings callback, so the settings are set here.
+        builder.Configuration.AddInMemoryCollection(
+        [
+            new("Aspire:OpenAI:DisableTracing", "true"),
+            new("Aspire:Azure:AI:OpenAI:DisableTracing", "true"),
+        ]);
+        return builder.AddOpenAIClientFromConfiguration("chatModel").AddChatClient();
     }
 
     // There is no Aspire client integration for Anthropic, so the client is built from the official SDK.
@@ -190,11 +204,20 @@ public static class Extensions
         var configuration = builder.Configuration;
         // The SDK's own retries cover connection errors, timeouts, 408, 409, 429 and 5xx and honour retry-after; no
         // resilience handler is layered on top, because two retry layers would multiply the attempts.
-        var clientOptions = new ClientOptions { ApiKey = apiKey, Timeout = ClaudeAttemptTimeout, MaxRetries = ClaudeMaxRetries };
+        // The SDK's own spans are off: ClaudeChatPipeline's chat spans cover each call, so none shows up twice.
+        var clientOptions = new ClientOptions
+        {
+            ApiKey = apiKey,
+            Timeout = ClaudeAttemptTimeout,
+            MaxRetries = ClaudeMaxRetries,
+            OpenTelemetry = new() { Traces = new() { Enabled = false } },
+        };
         var anthropic = new AnthropicClient(clientOptions)
             .AsIChatClient(ClaudeChatPipeline.GetModelId(configuration), ClaudeChatPipeline.GetMaxOutputTokens(configuration));
 
         builder.Services.AddChatClient(services => ClaudeChatPipeline.Build(anthropic, configuration, services));
+        builder.Services.AddOpenTelemetry()
+            .WithMetrics(metrics => metrics.AddMeter(ClaudeUsageTelemetryChatClient.MeterName));
     }
 
     public static async Task<string?> GetBuyerIdAsync(this AuthenticationStateProvider authenticationStateProvider)

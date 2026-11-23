@@ -14,11 +14,16 @@ public static class ClaudeChatPipeline
     private static readonly TimeSpan DefaultTurnDeadline = TimeSpan.FromSeconds(60);
 
     /// <summary>
-    /// Wraps <paramref name="inner"/> with a turn deadline, function invocation and request defaults: the model id and
-    /// output limit (<c>claude-haiku-4-5</c> and 1024, overridable under <c>Claude:ModelId</c> and
-    /// <c>Claude:MaxOutputTokens</c>) and thinking disabled. Options a caller sets take precedence.
+    /// Wraps <paramref name="inner"/> with a turn deadline, function invocation, telemetry and request defaults: the model
+    /// id and output limit (<c>claude-haiku-4-5</c> and 1024, overridable under <c>Claude:ModelId</c> and
+    /// <c>Claude:MaxOutputTokens</c>) and thinking disabled. Options a caller sets take precedence. Each model call is a
+    /// <c>chat</c> span with its tokens, cache tokens and, for a listed model, estimated cost, under the Turn's
+    /// <c>orchestrate_tools</c> span with the Turn's totals.
     /// </summary>
-    /// <param name="services">Resolves the logger for function invocation; optional outside dependency injection.</param>
+    /// <param name="services">
+    /// Resolves the loggers, and the host environment: spans carry message content only in Development. Optional outside
+    /// dependency injection, which means no message content.
+    /// </param>
     /// <param name="turnDeadline">
     /// How long a whole turn, every model request and tool call, may take before it is cancelled; 60 seconds by default.
     /// </param>
@@ -40,6 +45,8 @@ public static class ClaudeChatPipeline
                 options.Reasoning ??= new ReasoningOptions { Effort = ReasoningEffort.None };
             })
             .UseFunctionInvocation()
+            .UseChatTelemetry()
+            .Use(inner => new ClaudeUsageTelemetryChatClient(inner))
             .Build(services);
     }
 
