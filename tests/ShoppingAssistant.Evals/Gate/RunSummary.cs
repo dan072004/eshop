@@ -112,19 +112,27 @@ internal static class RunSummary
             .Concat(calibration?.Usage ?? [])
             .GroupBy(u => u.Model)
             .OrderBy(g => g.Key, StringComparer.Ordinal)
-            .Select(g => new TokenUsage(g.Key, g.Sum(u => u.InputTokens), g.Sum(u => u.OutputTokens)))
+            .Select(g => new TokenUsage(
+                g.Key, g.Sum(u => u.InputTokens), g.Sum(u => u.OutputTokens), g.Sum(u => u.CacheReadTokens), g.Sum(u => u.CacheWriteTokens)))
             .ToList();
 
-        summary.Append("### Tokens and estimated cost\n\n| Model | Input tokens | Output tokens | Estimated cost |\n|---|---:|---:|---:|\n");
+        summary.Append("### Tokens and estimated cost\n\n"
+            + "| Model | Input tokens | Cache-read tokens | Cache-write tokens | Output tokens | Estimated cost |\n|---|---:|---:|---:|---:|---:|\n");
         foreach (var usage in byModel)
         {
-            summary.Append(CultureInfo.InvariantCulture,
-                $"| {usage.Model} | {Tokens(usage.InputTokens)} | {Tokens(usage.OutputTokens)} | {Dollars(EstimateCost(usage))} |\n");
+            AppendCostRow(summary, usage, Dollars(EstimateCost(usage)));
         }
-        var total = byModel.Select(EstimateCost).Where(c => c is not null).Sum();
+        var total = new TokenUsage(
+            "**Total**", byModel.Sum(u => u.InputTokens), byModel.Sum(u => u.OutputTokens), byModel.Sum(u => u.CacheReadTokens), byModel.Sum(u => u.CacheWriteTokens));
+        AppendCostRow(summary, total, $"**{Dollars(byModel.Select(EstimateCost).Where(c => c is not null).Sum())}**");
+        summary.Append("\nInput tokens include the Prompt Cache's reads and writes, which are priced at their own rates. "
+            + "Only calls that reached a model count; a call replayed from the Cached Answers cost nothing this run.\n\n");
+    }
+
+    private static void AppendCostRow(StringBuilder summary, TokenUsage usage, string cost)
+    {
         summary.Append(CultureInfo.InvariantCulture,
-            $"| **Total** | {Tokens(byModel.Sum(u => u.InputTokens))} | {Tokens(byModel.Sum(u => u.OutputTokens))} | **{Dollars(total)}** |\n\n");
-        summary.Append("Only calls that reached a model count; a call replayed from the cache cost nothing this run.\n\n");
+            $"| {usage.Model} | {Tokens(usage.InputTokens)} | {Tokens(usage.CacheReadTokens)} | {Tokens(usage.CacheWriteTokens)} | {Tokens(usage.OutputTokens)} | {cost} |\n");
     }
 
     private static void AppendSamples(StringBuilder summary, IReadOnlyList<CaseResult> cases)
@@ -140,7 +148,11 @@ internal static class RunSummary
 
     private static string Dollars(decimal? cost) => cost is { } dollars ? "$" + dollars.ToString("F3", CultureInfo.InvariantCulture) : "unknown";
 
-    // The evals' usage record has no cache tokens yet, so they are priced as zero until prompt caching adds them.
+    // The input count includes the cache reads and writes, so they come off it to leave the uncached input.
     private static decimal? EstimateCost(TokenUsage usage)
-        => ClaudePrices.EstimateCost(usage.Model, new ClaudeTokenCounts(Input: usage.InputTokens, Output: usage.OutputTokens));
+        => ClaudePrices.EstimateCost(usage.Model, new ClaudeTokenCounts(
+            Input: usage.InputTokens - usage.CacheReadTokens - usage.CacheWriteTokens,
+            Output: usage.OutputTokens,
+            CacheRead: usage.CacheReadTokens,
+            CacheWrite: usage.CacheWriteTokens));
 }

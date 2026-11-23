@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Microsoft.Extensions.AI;
 
@@ -47,7 +47,8 @@ public sealed class ClaudeUsageTelemetryChatClient(IChatClient inner) : Delegati
     private static Activity? CurrentModelCallSpan()
         => Activity.Current is { } span && span.GetTagItem(OperationTagName) is ChatOperation ? span : null;
 
-    private static long? CacheWrites(UsageDetails? usage)
+    /// <summary>The cache-write tokens the Anthropic adapter reported, or null when it reported none.</summary>
+    public static long? CacheWrites(UsageDetails? usage)
         => usage?.AdditionalCounts?.TryGetValue(AdapterCacheWriteCountName, out var cacheWrites) == true ? cacheWrites : null;
 
     // The adapter's input count includes cache reads and writes, so they come off it to leave the uncached input.
