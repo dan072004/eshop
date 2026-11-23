@@ -17,7 +17,8 @@ public static class ClaudeChatPipeline
     /// Wraps <paramref name="inner"/> with a turn deadline, function invocation, telemetry and request defaults: the model
     /// id and output limit (<c>claude-haiku-4-5</c> and 1024, overridable under <c>Claude:ModelId</c> and
     /// <c>Claude:MaxOutputTokens</c>) and thinking disabled. Options a caller sets take precedence. Each model call is a
-    /// <c>chat</c> span with its tokens and cache tokens, under the Turn's <c>orchestrate_tools</c> span.
+    /// <c>chat</c> span with its tokens, cache tokens and, for a listed model, estimated cost, under the Turn's
+    /// <c>orchestrate_tools</c> span with the Turn's totals.
     /// </summary>
     /// <param name="services">
     /// Resolves the loggers, and the host environment: spans carry message content only in Development. Optional outside
@@ -45,7 +46,7 @@ public static class ClaudeChatPipeline
             })
             .UseFunctionInvocation()
             .UseChatTelemetry()
-            .Use(inner => new CacheWriteTelemetryChatClient(inner))
+            .Use(inner => new ClaudeUsageTelemetryChatClient(inner))
             .Build(services);
     }
 

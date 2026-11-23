@@ -216,6 +216,8 @@ public static class Extensions
             .AsIChatClient(ClaudeChatPipeline.GetModelId(configuration), ClaudeChatPipeline.GetMaxOutputTokens(configuration));
 
         builder.Services.AddChatClient(services => ClaudeChatPipeline.Build(anthropic, configuration, services));
+        builder.Services.AddOpenTelemetry()
+            .WithMetrics(metrics => metrics.AddMeter(ClaudeUsageTelemetryChatClient.MeterName));
     }
 
     public static async Task<string?> GetBuyerIdAsync(this AuthenticationStateProvider authenticationStateProvider)
