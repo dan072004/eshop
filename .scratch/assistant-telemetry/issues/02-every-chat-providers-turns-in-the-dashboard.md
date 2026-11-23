@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-human
+**Status:** done
 
 **First, before any code:** the Anthropic SDK 13.3.0 has its own OpenTelemetry support. Find out whether it emits spans, under which source name, whether it's on by default, and which usage attributes it writes (cache reads as well as writes?). If it emits `chat` spans, keep one source of them so a Claude call never shows up twice, and take the cache token attributes from the SDK instead of adding them. Record the findings in this ticket's Comments, and update the spec if they change a decision. Also find out whether Microsoft.Extensions.AI 10.11.0 already emits a span covering the whole Turn.
 
@@ -14,7 +14,7 @@
 - [x] Message content is captured only when the host environment is Development
 - [x] It is settled whether the adapter's input token count includes cached tokens; the answer is in this ticket's Comments for ticket 03
 - [x] A test builds the Claude chat pipeline over the real Anthropic adapter with a fake HTTP message handler that returns two Messages API responses (a tool call, then the answer) with known usage, including cache tokens. It captures spans with an activity listener and asserts, as literals, each `chat` span's tokens and cache tokens and the Turn span's totals
-- [ ] Manual check: a run with `ChatProvider=Claude` shows the Turn, its model calls and their tokens in the dashboard's AI view
+- [x] Manual check: a run with `ChatProvider=Claude` shows the Turn, its model calls and their tokens in the dashboard's AI view
 
 ## Comments
 
@@ -30,3 +30,4 @@ Review fixes (2026-11-18):
 
 - **The Ollama and Foundry integrations already emitted `chat` spans.** `CommunityToolkit.Aspire.OllamaSharp` 13.1.1 `AddChatClient` and `Aspire.OpenAI` 13.6.5 `AddChatClient` (behind `AddOpenAIClientFromConfiguration`) both wrap the inner client in `OpenTelemetryChatClient` (source `Experimental.Microsoft.Extensions.AI`) unless `DisableTracing` is set, checked in their decompiled `CreateInnerChatClient`. With our own step that made two `chat` spans per model call. WebApp now turns their tracing off (`OllamaSharpSettings.DisableTracing` through the settings callback; `Aspire:OpenAI:DisableTracing` and `Aspire:Azure:AI:OpenAI:DisableTracing` in configuration, since `AddOpenAIClientFromConfiguration` takes no callback), so the shared `UseChatTelemetry` step, inside function invocation with Development-only content, is the only one. The spec's Problem Statement and "Telemetry on every Chat Provider" now say so.
 - **Status is ready-for-human:** everything is built and tested; only the manual dashboard check above remains.
+- **Manual check passed (2026-11-23):** a run with `ChatProvider=Claude` showed the Turns in the dashboard's Traces, filtered by type Gen AI. Status is done.
