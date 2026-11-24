@@ -6,7 +6,7 @@ The only instruction to name the types is the last sentence of `get_order`'s des
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 **To triage:**
 - Find out which step fails, from the trace's `execute_tool` arguments (captured in Development): `get_order` never called; called, but the `question` has no types; or the types are there and Policy search still returns the generic rule.
@@ -17,7 +17,7 @@ The only instruction to name the types is the last sentence of `get_order`'s des
   3. An optional `orderNumber` parameter, with the server looking up the item types itself. Most reliable, but Policy search would then depend on Ordering.
 
 - [x] The failing step is identified and recorded in Comments
-- [ ] Haiku's pass rate on `returns-gps-watch-last-order` is recorded before and after the fix
+- [x] Haiku's pass rate on `returns-gps-watch-last-order` is recorded before and after the fix
 - [x] The chosen fix works for MCP clients as well as WebApp (nothing that relies only on WebApp's system prompt)
 - [x] If the tool contract changes, the MCP server and the assistant tool tests' expected JSON change with it
 
@@ -42,3 +42,9 @@ The only instruction to name the types is the last sentence of `get_order`'s des
 - `SearchPoliciesDescription` now ends "For a question about a specific order, pass its items' catalog types as itemTypes." `GetOrderDescription` now ends "…depend on an item's type: pass the types as search_policies' itemTypes."
 - The fix lives in the shared tools library, so eShop.Mcp serves the same parameter and descriptions. `McpToolsTests` now checks `search_policies`' parameters (`question`, `itemTypes`) and required list (`question`) separately. `SearchPoliciesToolTests` pins `search_policies`' parameter schema as a JSON literal. Both specs' tool contracts are updated.
 - **Pass rate after the fix: not measured yet.** The fresh run of `returns-gps-watch-last-order` failed with `invalid x-api-key` (the `ANTHROPIC_API_KEY` in the shell is rejected; $0 spent). Re-run with a valid key: `ESHOP_EVALS=1 ESHOP_EVALS_FRESH=1 ESHOP_EVALS_CASE=returns-gps-watch-last-order dotnet test --project tests/ShoppingAssistant.Evals`, and record pass rate plus how many samples fill `itemTypes`. Locally the build recorded no `ArtifactsPath`, so `ESHOP_EVALS_STORE` had to be set (e.g. `artifacts/evals-store`).
+
+**2026-11-24, measured after the fix.** Read from the fresh full eval run on main at `f9b6a39` (GitHub Actions run 45408966392, manual run for the prompt-caching ticket; 120 fresh samples, 38/40 cases, $1.10), so it cost nothing extra:
+
+- **Pass rate after the fix:** `returns-gps-watch-last-order` passed (not among the run's failing cases). Before: 3/3.
+- **`itemTypes` filled:** 3/3 samples passed `["Navigation", "Jackets"]`. Before the fix, 1 of 3 samples' questions named no types.
+- Other order cases fill `itemTypes` too (e.g. `Footwear`, `Cycling`, `Helmets`).
