@@ -19,3 +19,7 @@ Say which paid runs a step starts before running it.
 - [ ] Before/after estimated chat cost from the two eval run summaries, recorded in the PR
 - [ ] Proven when cache reads are above zero on model calls after a Policy search **and** "after" chat cost is lower than "before"
 - [ ] If either part fails: marker removed, the finding recorded in the PR; only then consider a Sonnet comparison
+
+## Comments
+
+**2026-11-24:** The "after" run is the fresh eval run on main after both this PR and the fix for assistant-policies-and-orders ticket 09 merge. That fix adds an optional `itemTypes` parameter and a sentence to `search_policies`, so "after" sends a tool prefix a few dozen tokens longer than "before". Accepted: the difference is small next to a cached prefix of ~4,500 tokens. Record it next to the before/after numbers.

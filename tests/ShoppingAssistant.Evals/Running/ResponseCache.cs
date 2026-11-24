@@ -110,7 +110,7 @@ public sealed class CachedModel(IChatClient model, IEvaluationResponseCacheProvi
                     var tokens = ClaudeTokenCounts.FromAdapterUsage(usage);
                     _usage.Add(new(
                         response.ModelId ?? options?.ModelId ?? "unknown",
-                        usage.InputTokenCount ?? 0,
+                        usage.InputTokenCount ?? 0, // The adapter's count, cache tokens included, as TokenUsage expects.
                         tokens.Output,
                         tokens.CacheRead,
                         tokens.CacheWrite));

@@ -48,14 +48,14 @@ public sealed class CachedModelTests : IDisposable
     }
 
     [Fact]
-    public async Task OnlyTheTurnsThatReachTheModelReportTheirTokens()
+    public async Task OnlyTheTurnsThatReachTheModelReportTheirTokensIncludingPromptCacheTokens()
     {
         await TokensOfAsync("what's the return window?");
 
         // The first turn is replayed, so only the second, new turn is billed.
         var tokens = await TokensOfAsync("what's the return window?", "and for the jacket?");
 
-        Assert.Equal([("claude-haiku-4-5", 100L, 20L)], tokens);
+        Assert.Equal([("claude-haiku-4-5", 100L, 20L, 60L, 30L)], tokens);
     }
 
     private async Task<(string Answer, int ModelCalls)> AskAsync(bool fresh, string cachingKey = "case:a")
@@ -67,7 +67,7 @@ public sealed class CachedModelTests : IDisposable
         return (response.Text, sample.ModelCalls);
     }
 
-    private async Task<IReadOnlyList<(string Model, long InputTokens, long OutputTokens)>> TokensOfAsync(params string[] turns)
+    private async Task<IReadOnlyList<(string Model, long InputTokens, long OutputTokens, long CacheReadTokens, long CacheWriteTokens)>> TokensOfAsync(params string[] turns)
     {
         var cachedModel = new CachedModel(_model, ResponseCache.Provider(_store, fresh: false));
         var sample = await cachedModel.OpenAsync("returns-gps-watch-last-order", "1", ["case:a"], TestContext.Current.CancellationToken);
@@ -79,10 +79,11 @@ public sealed class CachedModelTests : IDisposable
             var response = await sample.ChatClient.GetResponseAsync(conversation, cancellationToken: TestContext.Current.CancellationToken);
             conversation.AddRange(response.Messages);
         }
-        return [.. sample.Usage.Select(u => (u.Model, u.InputTokens, u.OutputTokens))];
+        return [.. sample.Usage.Select(u => (u.Model, u.InputTokens, u.OutputTokens, u.CacheReadTokens, u.CacheWriteTokens))];
     }
 
-    // Answers "answer 1", "answer 2", ... in the order it is called, reporting 100 input and 20 output tokens each.
+    // Answers "answer 1", "answer 2", ... in the order it is called. Each reports usage the way the Anthropic adapter does:
+    // 100 input tokens, which include 60 read from and 30 written to the Prompt Cache, and 20 output tokens.
     private sealed class NumberedAnswers : IChatClient
     {
         private int _calls;
@@ -91,7 +92,13 @@ public sealed class CachedModelTests : IDisposable
             Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, $"answer {Interlocked.Increment(ref _calls)}"))
             {
                 ModelId = "claude-haiku-4-5",
-                Usage = new UsageDetails { InputTokenCount = 100, OutputTokenCount = 20 },
+                Usage = new UsageDetails
+                {
+                    InputTokenCount = 100,
+                    OutputTokenCount = 20,
+                    CachedInputTokenCount = 60,
+                    AdditionalCounts = new() { ["CacheCreationInputTokens"] = 30 },
+                },
             });
 
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
