@@ -59,6 +59,22 @@ public class SearchPoliciesToolTests
     }
 
     [TestMethod]
+    public async Task SearchPoliciesAddsTheItemTypesToTheSearch()
+    {
+        var policy = new FakeHandler(_ => Json(HttpStatusCode.OK, PolicySearchResponse));
+        var tool = BuildTools(policy).SearchPolicies;
+
+        await InvokeAsync(tool, new()
+        {
+            ["question"] = "What is the return window for my order?",
+            ["itemTypes"] = new[] { "Navigation", "Jackets" },
+        });
+
+        var query = System.Web.HttpUtility.ParseQueryString(policy.Requests.Single().RequestUri!.Query);
+        Assert.AreEqual("What is the return window for my order? Navigation Jackets", query["q"]);
+    }
+
+    [TestMethod]
     public async Task SearchPoliciesPassesTheSemanticModeThrough()
     {
         var semanticResponse = new { Mode = "semantic", Results = Array.Empty<object>() };
@@ -114,19 +130,31 @@ public class SearchPoliciesToolTests
     }
 
     [TestMethod]
-    public void SearchPoliciesHasTheContractNameParameterAndCitationRule()
+    public void SearchPoliciesHasTheContractNameParametersAndCitationRule()
     {
         var tools = BuildTools(new FakeHandler(_ => Json(HttpStatusCode.OK, PolicySearchResponse)));
         var tool = tools.SearchPolicies;
 
         Assert.AreEqual("search_policies", tool.Name);
         var properties = tool.JsonSchema.GetProperty("properties");
-        Assert.AreEqual("question", properties.EnumerateObject().Single().Name);
+        const string expectedProperties = """
+            {
+              "question": { "description": "The Buyer's question about an AdventureWorks Policy", "type": "string" },
+              "itemTypes": {
+                "description": "The catalog types of the order's items, as get_order returns them",
+                "type": ["array", "null"],
+                "items": { "type": ["string", "null"] },
+                "default": null
+              }
+            }
+            """;
+        Assert.IsTrue(JsonElement.DeepEquals(JsonDocument.Parse(expectedProperties).RootElement, properties), properties.GetRawText());
         Assert.AreEqual("question", tool.JsonSchema.GetProperty("required").EnumerateArray().Single().GetString());
         Assert.AreEqual(
             "AdventureWorks Policies on returns, exchanges, shipping, warranty, sizing, payments and orders. " +
             "State Policy rules only from these results; cite each rule with its citation value; " +
-            "if no result answers the question, say so.",
+            "if no result answers the question, say so. " +
+            "For a question about a specific order, pass its items' catalog types as itemTypes.",
             tool.Description);
         CollectionAssert.Contains(tools.All.ToArray(), tool);
     }

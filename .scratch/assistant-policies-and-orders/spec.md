@@ -122,15 +122,15 @@ For "what's the return window for my last order?" on a shipped order containing 
 - Tools are exposed as `AIFunction`s with explicit snake_case names and descriptions, so WebApp passes them straight into its chat options and eShop.Mcp can wrap them as MCP tools.
 - The library contains typed HTTP clients for policy-api, Ordering.API (v1) and Catalog.API (v2), addressed by Aspire service name. It knows nothing about `ClaimsPrincipal`, `HttpContext` or Blazor. The host registers the clients and attaches its own `DelegatingHandler` to the Ordering client. The policy and catalog clients need no token.
 - **Tool contract.** This is the hand-off to the eShop.Mcp grilling: change it only on purpose, and update both specs when you do.
-  - `search_policies(question: string)`
-    - Calls the search endpoint with `top` 5 and returns its `mode` and `results` as they come.
-    - Description: AdventureWorks Policies on returns, exchanges, shipping, warranty, sizing, payments and orders. State Policy rules only from these results; cite each rule with its `citation` value; if no result answers the question, say so.
+  - `search_policies(question: string, itemTypes?: string[])`
+    - Calls the search endpoint with `top` 5 and returns its `mode` and `results` as they come. `itemTypes` (catalog type names) are appended to the question before searching. (Contract change from ticket 09: a generic question sometimes named no item types, so the search missed the type-specific Policy Sections.)
+    - Description: AdventureWorks Policies on returns, exchanges, shipping, warranty, sizing, payments and orders. State Policy rules only from these results; cite each rule with its `citation` value; if no result answers the question, say so. For a question about a specific order, pass its items' catalog types as itemTypes.
   - `list_my_orders()`
     - Returns `{ today, orders: [ { orderNumber, orderDate, status, total } ] }`, newest-first, as Ordering returns them.
     - Description ends: …but no items; call get_order for an order's items. (Contract change from acceptance ticket 08: with only the list, the model gave the standard 60-day Return Window to a Navigation item.)
   - `get_order(orderNumber: int)`
     - Returns `{ today, orderNumber, orderDate, status, items: [ { productId, productName, units, unitPrice, type, brand } ] }`.
-    - Description ends: Some Policy rules, such as Return Windows, depend on an item's type: name the types when searching the Policies. (Same change: a search for just "return window" doesn't rank Returns Exceptions.)
+    - Description ends: Some Policy rules, such as Return Windows, depend on an item's type: pass the types as search_policies' itemTypes. (Same change, reworded in ticket 09: a search for just "return window" doesn't rank Returns Exceptions.)
     - `type` and `brand` come from Catalog.API by `productId`. If an item can't be found in the catalog, they are `null`; the tool doesn't fail.
     - If Catalog.API itself fails, the whole call returns `unavailable` rather than items with `null` types, so the model never gives a Return Window without the item types it depends on.
   - `search_catalog(productDescription: string)`

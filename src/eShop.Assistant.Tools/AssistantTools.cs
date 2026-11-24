@@ -20,12 +20,14 @@ public sealed partial class AssistantTools
 
     /// <summary>
     /// The citation rule travels with the tool, so any model that calls it (including MCP clients, which never see
-    /// WebApp's system prompt) is told to state rules only from results and to cite each one.
+    /// WebApp's system prompt) is told to state rules only from results and to cite each one. It also asks for an
+    /// order's item types, which find the type-specific Policy Sections a generic question misses.
     /// </summary>
     public const string SearchPoliciesDescription =
         "AdventureWorks Policies on returns, exchanges, shipping, warranty, sizing, payments and orders. " +
         "State Policy rules only from these results; cite each rule with its citation value; " +
-        "if no result answers the question, say so.";
+        "if no result answers the question, say so. " +
+        "For a question about a specific order, pass its items' catalog types as itemTypes.";
 
     /// <summary>
     /// Points the model at <c>get_order</c>: without it, a model that only lists orders never sees the item types
@@ -44,7 +46,7 @@ public sealed partial class AssistantTools
         "Gets one of the signed-in Buyer's own AdventureWorks orders by its order number, with today's date (UTC). " +
         "It has the Order Date, status and items; each item has its product id and name, units, unit price, " +
         "and its catalog type and brand (null when the catalog doesn't know the product). " +
-        "Some Policy rules, such as Return Windows, depend on an item's type: name the types when searching the Policies.";
+        "Some Policy rules, such as Return Windows, depend on an item's type: pass the types as search_policies' itemTypes.";
 
     private readonly CatalogClient _catalog;
     private readonly PolicyClient _policy;
@@ -95,7 +97,7 @@ public sealed partial class AssistantTools
         All = [SearchPolicies, ListMyOrders, GetOrder, SearchCatalog];
     }
 
-    /// <summary><c>search_policies(question)</c>.</summary>
+    /// <summary><c>search_policies(question, itemTypes?)</c>.</summary>
     public AIFunction SearchPolicies { get; }
 
     /// <summary><c>list_my_orders()</c>.</summary>
@@ -112,8 +114,9 @@ public sealed partial class AssistantTools
 
     private Task<object> SearchPoliciesAsync(
         [Description("The Buyer's question about an AdventureWorks Policy")] string question,
-        CancellationToken cancellationToken) =>
-        GuardAsync(() => _policy.SearchAsync(question, PolicySearchTop, cancellationToken),
+        [Description("The catalog types of the order's items, as get_order returns them")] string[]? itemTypes = null,
+        CancellationToken cancellationToken = default) =>
+        GuardAsync(() => _policy.SearchAsync(string.Join(' ', [question, .. itemTypes ?? []]), PolicySearchTop, cancellationToken),
             "Error searching the Policies.", cancellationToken);
 
     private Task<object> SearchCatalogAsync(

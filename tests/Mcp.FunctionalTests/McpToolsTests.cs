@@ -50,13 +50,13 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
         var libraryDescriptions = scope.ServiceProvider.GetRequiredService<AssistantTools>().All
             .ToDictionary(f => f.Name, f => f.Description);
 
-        // The tool contract (spec): names and parameter names, nothing added by eShop.Mcp.
-        var expected = new Dictionary<string, string[]>
+        // The tool contract (spec): names, parameter names and which are required, nothing added by eShop.Mcp.
+        var expected = new Dictionary<string, (string[] Parameters, string[] Required)>
         {
-            ["search_policies"] = ["question"],
-            ["search_catalog"] = ["productDescription"],
-            ["list_my_orders"] = [],
-            ["get_order"] = ["orderNumber"],
+            ["search_policies"] = (["question", "itemTypes"], ["question"]),
+            ["search_catalog"] = (["productDescription"], ["productDescription"]),
+            ["list_my_orders"] = ([], []),
+            ["get_order"] = (["orderNumber"], ["orderNumber"]),
         };
         Assert.Equal(expected.Keys.Order(), tools.Select(t => t.Name).Order());
         foreach (var tool in tools)
@@ -67,8 +67,8 @@ public sealed class McpToolsTests(McpServerFixture fixture) : IClassFixture<McpS
             var required = tool.JsonSchema.TryGetProperty("required", out var requiredNames)
                 ? requiredNames.EnumerateArray().Select(n => n.GetString()!).ToArray()
                 : [];
-            Assert.Equal(expected[tool.Name], parameters);
-            Assert.Equal(expected[tool.Name], required);
+            Assert.Equal(expected[tool.Name].Parameters, parameters);
+            Assert.Equal(expected[tool.Name].Required, required);
             Assert.Equal(libraryDescriptions[tool.Name], tool.Description);
             Assert.Null(tool.ProtocolTool.OutputSchema);
         }
