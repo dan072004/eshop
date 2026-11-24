@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.AI;
+﻿using eShop.WebApp.Chatbot;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
 using Microsoft.Extensions.AI.Evaluation.Reporting;
 using Microsoft.Extensions.AI.Evaluation.Reporting.Storage;
@@ -106,7 +107,13 @@ public sealed class CachedModel(IChatClient model, IEvaluationResponseCacheProvi
             {
                 lock (_usage)
                 {
-                    _usage.Add(new(response.ModelId ?? options?.ModelId ?? "unknown", usage.InputTokenCount ?? 0, usage.OutputTokenCount ?? 0));
+                    var tokens = ClaudeTokenCounts.FromAdapterUsage(usage);
+                    _usage.Add(new(
+                        response.ModelId ?? options?.ModelId ?? "unknown",
+                        usage.InputTokenCount ?? 0, // The adapter's count, cache tokens included, as TokenUsage expects.
+                        tokens.Output,
+                        tokens.CacheRead,
+                        tokens.CacheWrite));
                 }
             }
             return response;

@@ -6,7 +6,7 @@ The only instruction to name the types is the last sentence of `get_order`'s des
 
 **Blocked by:** None (can start immediately)
 
-**Status:** needs-triage
+**Status:** ready-for-agent
 
 **To triage:**
 - Find out which step fails, from the trace's `execute_tool` arguments (captured in Development): `get_order` never called; called, but the `question` has no types; or the types are there and Policy search still returns the generic rule.
@@ -20,3 +20,18 @@ The only instruction to name the types is the last sentence of `get_order`'s des
 - [ ] Haiku's pass rate on `returns-gps-watch-last-order` is recorded before and after the fix
 - [ ] The chosen fix works for MCP clients as well as WebApp (nothing that relies only on WebApp's system prompt)
 - [ ] If the tool contract changes, the MCP server and the assistant tool tests' expected JSON change with it
+
+## Comments
+
+**2026-11-24, triage from the fresh eval run on main (2026-11-23, Haiku, keyword search, `returns-gps-watch-last-order`, 3 samples).** Read from the stored samples' tool calls, so it cost nothing extra:
+
+| Sample | `get_order` called | `search_policies` question | GPS section returned | Passed |
+|---|---|---|---|---|
+| 1 | yes (order 101) | "What is the return window for Navigation and Jackets products?" | yes, first | yes |
+| 2 | yes (order 101) | "What is the return window for products?" | yes, third of five | yes |
+| 3 | yes (order 101) | "What is the return window for Navigation and Jackets products?" | yes, first | yes |
+
+- **Failing step:** `get_order` is called, but the `question` sometimes names no types (1 of 3 samples). Policy search isn't at fault: when the types are named, it ranks the Navigation section first.
+- **Why the eval passes anyway:** the generic question still matched "Returns Exceptions › GPS watches…" by keyword, lower down the results, and Haiku used it. In the 2026-11-23 Development trace, the generic question returned only the standard rule.
+- **Pass rate before the fix:** 3/3. That's too coarse to show whether a fix helps, so measure "types named in the `search_policies` question" across samples as well as pass/fail.
+- **Fix chosen:** option 2 with 1. `search_policies` gets an optional `itemTypes` parameter (catalog type names), which the server adds to the search, and its description asks the model to fill it in for a question about a specific order. Measure after the fix the same way: pass rate plus how many samples fill `itemTypes`.

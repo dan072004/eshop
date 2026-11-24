@@ -125,7 +125,9 @@ public sealed class RunGateTests
     [Fact]
     public void TheSummaryGivesTheScoreCategoriesFailuresWithReasonsJudgeErrorsTokensCostAndCachedSamples()
     {
-        TokenUsage[] usage = [new("claude-haiku-4-5-20251001", 1_000, 200), new("claude-sonnet-5-5", 2_000, 100)];
+        // The chat model reads 600 and writes 100 of its 1,000 input tokens from the Prompt Cache; the judge isn't cached.
+        TokenUsage[] usage =
+            [new("claude-haiku-4-5-20251001", 1_000, 200, CacheReadTokens: 600, CacheWriteTokens: 100), new("claude-sonnet-5-5", 2_000, 100)];
         var citationMissing = new CheckFailure("Citations present", "Not cited: \"Returns Exceptions › GPS watches, navigators and bike computers\".");
         var wrongDays = new CheckFailure("Rubric: Gives the GPS watch 30 days", "It gives the watch 60 days.");
         SampleResult[] samples =
@@ -171,13 +173,13 @@ public sealed class RunGateTests
 
             ### Tokens and estimated cost
 
-            | Model | Input tokens | Output tokens | Estimated cost |
-            |---|---:|---:|---:|
-            | claude-haiku-4-5-20251001 | 5,000 | 1,000 | $0.010 |
-            | claude-sonnet-5-5 | 13,000 | 700 | $0.033 |
-            | **Total** | 18,000 | 1,700 | **$0.043** |
+            | Model | Input tokens | Cache-read tokens | Cache-write tokens | Output tokens | Estimated cost |
+            |---|---:|---:|---:|---:|---:|
+            | claude-haiku-4-5-20251001 | 5,000 | 3,000 | 500 | 1,000 | $0.007 |
+            | claude-sonnet-5-5 | 13,000 | 0 | 0 | 700 | $0.033 |
+            | **Total** | 18,000 | 3,000 | 500 | 1,700 | **$0.040** |
 
-            Only calls that reached a model count; a call replayed from the cache cost nothing this run.
+            Input tokens include the Prompt Cache's reads and writes, which are priced at their own rates. Only calls that reached a model count; a call replayed from the Cached Answers cost nothing this run.
 
             ### Samples
 
