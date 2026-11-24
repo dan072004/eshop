@@ -148,6 +148,6 @@ internal static class RunSummary
 
     private static string Dollars(decimal? cost) => cost is { } dollars ? "$" + dollars.ToString("F3", CultureInfo.InvariantCulture) : "unknown";
 
-    private static decimal? EstimateCost(TokenUsage usage) => ClaudePrices.EstimateCost(usage.Model,
+    private static decimal? EstimateCost(TokenUsage usage) => ClaudePrices.EstimateCostUsd(usage.Model,
         ClaudeTokenCounts.FromAdapterTotals(usage.InputTokens, usage.OutputTokens, usage.CacheReadTokens, usage.CacheWriteTokens));
 }

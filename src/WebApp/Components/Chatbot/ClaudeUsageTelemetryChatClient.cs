@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Microsoft.Extensions.AI;
 
@@ -34,7 +34,7 @@ public sealed class ClaudeUsageTelemetryChatClient(IChatClient inner) : Delegati
         var modelCall = CurrentModelCallSpan();
         var tokens = ClaudeTokenCounts.FromAdapterUsage(response.Usage);
         modelCall?.SetTag(CacheWriteTagName, tokens.CacheWrite);
-        if (options?.ModelId is { } modelId && ClaudePrices.EstimateCost(modelId, tokens) is { } cost)
+        if (options?.ModelId is { } modelId && ClaudePrices.EstimateCostUsd(modelId, tokens) is { } cost)
         {
             RecordCost(modelCall, modelId, cost);
         }
